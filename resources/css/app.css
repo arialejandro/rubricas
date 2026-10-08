@@ -1,0 +1,35 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --color-brand-50: #eef4fb;
+    --color-brand-100: #d7e5f5;
+    --color-brand-600: #2b5d94;
+    --color-brand-700: #1e4a7a;
+    --color-brand-900: #1e3a5f;
+}
+
+@layer components {
+    .card { @apply rounded-2xl border border-slate-200 bg-white shadow-sm; }
+    .label { @apply mb-1 block text-sm font-medium text-slate-700; }
+    .input { @apply block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 shadow-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-100 focus:outline-none; }
+    .btn { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition select-none disabled:opacity-50; }
+    /* Se usan junto con .btn: class="btn btn-primary" (Tailwind 4 no permite @apply de clases propias). */
+    .btn-primary { @apply bg-brand-700 text-white hover:bg-brand-900 active:scale-[.98]; }
+    .btn-ghost { @apply border border-slate-300 bg-white text-slate-700 hover:bg-slate-50; }
+    .btn-danger { @apply border border-red-200 bg-white text-red-700 hover:bg-red-50; }
+    .chip { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+
+    /* Celda de calificación: estados que pinta el autoguardado (resources/js/app.js). */
+    .score-input { @apply w-16 rounded-lg border border-slate-300 bg-white px-1 py-2 text-center text-base font-semibold tabular-nums focus:border-brand-600 focus:ring-2 focus:ring-brand-100 focus:outline-none; }
+    .score-input.is-empty { @apply border-amber-300 bg-amber-50; }
+    .score-input.is-saving { @apply border-sky-400; }
+    .score-input.is-saved { @apply border-emerald-500 bg-emerald-50; }
+    .score-input.is-error { @apply border-red-500 bg-red-50 text-red-700; }
+}
+
+/* Evita el zoom automático de iOS al enfocar inputs (necesita >= 16px). */
+input, select, textarea { font-size: 16px; }
