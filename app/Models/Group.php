@@ -7,9 +7,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'school_year'])]
+/**
+ * Grupo = salón de una maestra en un turno. `name` es la letra del grupo ("B");
+ * label() lo arma con el grado: "3° B".
+ */
+#[Fillable(['shift', 'grade', 'name', 'school_year', 'school_name', 'school_cct', 'school_zone'])]
 class Group extends Model
 {
+    public const SHIFTS = ['matutino' => 'Matutino', 'vespertino' => 'Vespertino'];
+
+    public const MAX_PER_TEACHER = 2;
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -28,5 +36,15 @@ class Group extends Model
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class)->orderByRaw('due_date IS NULL, due_date')->orderBy('id');
+    }
+
+    public function label(): string
+    {
+        return $this->grade ? "{$this->grade}° {$this->name}" : $this->name;
+    }
+
+    public function shiftLabel(): string
+    {
+        return self::SHIFTS[$this->shift] ?? $this->shift;
     }
 }

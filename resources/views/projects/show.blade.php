@@ -1,112 +1,109 @@
 @php($fmt = fn ($n) => rtrim(rtrim(number_format($n, 2, '.', ''), '0'), '.'))
 <x-layouts.app :title="$project->name">
     <x-slot:breadcrumbs>
-        <a href="{{ route('dashboard') }}" class="hover:text-brand-700">Mis grupos</a>
-        <span>/</span><a href="{{ route('grupos.show', $group) }}" class="hover:text-brand-700">{{ $group->name }}</a>
+        <a href="{{ route('projects.index', $group) }}" class="flex items-center gap-1 hover:text-primary"><x-icon name="chevron-left" class="size-4" /> Proyectos</a>
     </x-slot:breadcrumbs>
 
     <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-            <h1 class="text-2xl font-bold">{{ $project->name }}</h1>
-            <p class="text-sm text-slate-500">
-                @if ($project->due_date) {{ $project->due_date->translatedFormat('j \d\e F Y') }} · @endif
-                {{ $book->criteria->count() }} {{ Str::plural('aspecto', $book->criteria->count()) }} · {{ $book->students->count() }} alumnos
+        <div class="min-w-0">
+            <h1 class="text-2xl font-bold sm:text-3xl">{{ $project->name }}</h1>
+            <p class="text-ink-muted">
+                @if ($project->due_date) {{ $project->due_date->translatedFormat('j \d\e F') }} · @endif
+                {{ $book->students->count() }} alumnos
+                @if ($project->description) · {{ $project->description }} @endif
             </p>
-            @if ($project->description)
-                <p class="mt-1 text-sm text-slate-600">{{ $project->description }}</p>
-            @endif
         </div>
-        <div class="flex flex-wrap gap-2">
-            <a href="{{ route('projects.edit', [$group, $project]) }}" class="btn btn-ghost">Editar rúbrica</a>
-            <a href="{{ route('export.project', [$group, $project]) }}" class="btn btn-ghost">⬇ Excel</a>
+        <div class="flex gap-2">
+            <a href="{{ route('projects.edit', [$group, $project]) }}" class="btn btn-ghost"><x-icon name="pencil" class="size-4" /> Rúbrica</a>
+            <a href="{{ route('export.project', [$group, $project]) }}" class="btn btn-ghost"><x-icon name="download" class="size-4" /> Excel</a>
         </div>
     </div>
 
     @if ($book->students->isEmpty())
-        <div class="card border-amber-200 bg-amber-50 p-5">
-            <p class="mb-3 font-semibold text-amber-900">El grupo no tiene alumnos activos.</p>
-            <a href="{{ route('students.index', $group) }}" class="btn btn-primary">Agregar alumnos</a>
+        <div class="card flex flex-wrap items-center gap-3 p-5">
+            <p class="flex-1 font-semibold">El grupo no tiene alumnos activos.</p>
+            <a href="{{ route('students.index', $group) }}" class="btn btn-primary">Cargar lista</a>
         </div>
     @else
-        {{-- Avance + accesos directos al modo captura por aspecto --}}
-        <section class="card mb-5 p-5">
+        <section class="card mb-5 p-4 sm:p-5">
             <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                <p class="font-semibold">
-                    <span data-project-graded>{{ $book->gradedCells() }}</span> de {{ $book->totalCells() }} calificaciones
-                    <span class="text-slate-400">(<span data-project-progress>{{ $book->progress() }}%</span>)</span>
-                </p>
-                <p class="text-sm text-amber-700"><span data-project-missing>{{ $book->missingCells() }}</span> pendientes</p>
+                <p class="font-semibold"><span class="num" data-project-graded="{{ $project->id }}">{{ $book->gradedCells() }}</span> de <span class="num">{{ $book->totalCells() }}</span> calificaciones</p>
+                <p class="text-sm"><span class="num font-bold text-pending" data-project-missing="{{ $project->id }}">{{ $book->missingCells() }}</span> <span class="text-ink-muted">pendientes ·</span> <span class="num font-bold" data-project-progress="{{ $project->id }}">{{ $book->progress() }}%</span></p>
             </div>
-            <x-progress :graded="$book->gradedCells()" :total="$book->totalCells()" live />
-
-            <p class="mt-4 mb-2 text-sm font-medium text-slate-600">Capturar por aspecto</p>
-            <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                @foreach ($book->criteria as $c)
-                    @php($m = $book->missingForCriterion($c))
-                    <a href="{{ route('capture', [$group, $project, $c]) }}" class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-3 hover:border-brand-600 hover:bg-brand-50">
-                        <span>
-                            <span class="font-semibold">{{ $c->name }}</span>
-                            <span class="text-sm text-slate-400">{{ $fmt($c->weight) }}%</span>
-                        </span>
-                        <span class="text-xs font-semibold {{ $m ? 'text-amber-700' : 'text-emerald-700' }}" data-criterion-missing="{{ $c->id }}">{{ $m ? "{$m} sin calificar" : '✓' }}</span>
-                    </a>
-                @endforeach
-            </div>
+            <x-progress :value="$book->progress()" :project="$project->id" />
         </section>
 
-        <div class="mb-2 flex items-center justify-between">
-            <h2 class="text-lg font-bold">Todas las calificaciones</h2>
-            <label class="flex items-center gap-2 text-sm text-slate-600">
-                <input type="checkbox" class="size-4" data-filter-pending> Solo pendientes
-            </label>
+        {{-- Aspectos: un tap y a capturar --}}
+        <h2 class="mb-3 text-lg font-bold">Calificar por aspecto</h2>
+        <div class="mb-8 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+            @foreach ($book->criteria as $c)
+                @php($m = $book->missingForCriterion($c))
+                @php($done = $book->students->count() - $m)
+                <a href="{{ route('capture', [$group, $project, $c]) }}" class="tile min-h-32">
+                    <div class="flex items-start justify-between gap-2">
+                        <span class="num rounded-lg bg-surface-2 px-2 py-1 text-sm font-bold">{{ $fmt($c->weight) }}%</span>
+                        <x-icon name="chevron-right" class="size-5 text-ink-muted" />
+                    </div>
+                    <h3 class="line-clamp-2 text-lg font-bold leading-snug">{{ $c->name }}</h3>
+                    <div class="mt-auto">
+                        <div class="mb-1 flex justify-between text-xs">
+                            <span class="font-semibold {{ $m ? 'text-pending' : 'text-done' }}" data-criterion-missing="{{ $c->id }}">{{ $m ? "{$m} sin calificar" : 'Completo' }}</span>
+                            <span class="num text-ink-muted" data-criterion-count="{{ $c->id }}">{{ $done }}/{{ $book->students->count() }}</span>
+                        </div>
+                        <x-progress :value="(int) floor($done * 100 / max(1, $book->students->count()))" :criterion="$c->id" />
+                    </div>
+                </a>
+            @endforeach
         </div>
 
-        <section class="card overflow-x-auto" data-grades-url="{{ route('grades.update', [$group, $project]) }}">
+        {{-- Matriz completa: cada casilla abre el teclado; avanza hacia abajo por el mismo aspecto --}}
+        <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <h2 class="text-lg font-bold">Todas las calificaciones</h2>
+        </div>
+        <x-search class="mb-3" pending-toggle="Solo pendientes" />
+
+        <section class="card overflow-x-auto" data-grades-url="{{ route('grades.update', [$group, $project]) }}" data-advance="column">
             <table class="w-full border-collapse text-sm">
                 <thead>
-                    <tr class="bg-slate-50 text-left text-slate-600">
-                        <th class="sticky left-0 z-10 min-w-48 bg-slate-50 px-3 py-3 font-semibold">Alumno</th>
+                    <tr class="border-b border-line text-left text-ink-muted">
+                        <th class="sticky left-0 z-10 min-w-52 bg-surface px-4 py-3 font-semibold">Alumno</th>
                         @foreach ($book->criteria as $c)
                             <th class="px-2 py-3 text-center font-semibold">
-                                <div class="leading-tight">{{ $c->name }}</div>
-                                <div class="text-xs font-normal text-slate-400">{{ $fmt($c->weight) }}%</div>
+                                <span class="block max-w-28 truncate text-ink" title="{{ $c->name }}">{{ $c->name }}</span>
+                                <span class="num text-xs font-normal">{{ $fmt($c->weight) }}%</span>
                             </th>
                         @endforeach
                         <th class="px-2 py-3 text-center font-semibold">%</th>
-                        <th class="px-2 py-3 text-center font-semibold">Final</th>
-                        <th class="px-3 py-3 text-center font-semibold">Estado</th>
+                        <th class="px-2 py-3 text-center font-semibold text-ink">Final</th>
+                        <th class="px-4 py-3 text-center font-semibold">Estado</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+                <tbody class="divide-y divide-line">
                     @foreach ($book->students as $s)
                         @php($complete = $book->isComplete($s))
-                        <tr data-student-row="{{ $s->id }}" data-complete="{{ $complete ? 1 : 0 }}" class="hover:bg-slate-50/60">
-                            <td class="sticky left-0 z-10 bg-white px-3 py-2">
-                                <span class="mr-1 inline-block w-6 text-right text-xs tabular-nums text-slate-400">{{ $s->list_number }}</span>
-                                <span class="font-medium">{{ $s->name }}</span>
+                        @php($key = $project->id.':'.$s->id)
+                        <tr data-search-item data-search-text="{{ $s->name }}" data-search-number="{{ $s->list_number }}"
+                            data-done="{{ $complete ? 1 : 0 }}" data-row-done="{{ $key }}">
+                            <td class="sticky left-0 z-10 bg-surface px-4 py-2">
+                                <span class="num mr-1 inline-block w-6 text-right text-xs text-ink-muted">{{ $s->list_number }}</span>
+                                <a href="{{ route('students.show', [$group, $s]) }}" class="font-medium hover:text-primary">{{ $s->name }}</a>
                             </td>
                             @foreach ($book->criteria as $c)
-                                @php($score = $book->score($s->id, $c->id))
-                                <td class="px-2 py-1.5 text-center">
-                                    <input class="score-input" inputmode="decimal" autocomplete="off" enterkeyhint="next"
-                                           value="{{ $score === null ? '' : $fmt($score) }}"
-                                           data-student="{{ $s->id }}" data-criterion="{{ $c->id }}"
-                                           aria-label="{{ $s->name }} · {{ $c->name }}">
-                                </td>
+                                <td class="px-2 py-1.5 text-center"><x-score :student="$s" :criterion="$c" :value="$book->score($s->id, $c->id)" /></td>
                             @endforeach
-                            <td class="px-2 text-center tabular-nums text-slate-500" data-student-percent="{{ $s->id }}">{{ $fmt($book->finalPercent($s)) }}%</td>
-                            <td class="px-2 text-center text-base font-bold tabular-nums {{ $complete ? '' : 'text-slate-300' }}" data-student-final="{{ $s->id }}"
-                                title="{{ $complete ? '' : 'Provisional: faltan aspectos por calificar' }}">{{ $fmt($book->finalScore($s)) }}</td>
-                            <td class="px-3 text-center">
-                                <span class="chip whitespace-nowrap {{ $complete ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}" data-student-status="{{ $s->id }}">
-                                    {{ $complete ? 'Completo' : 'Faltan '.$book->missingFor($s)->count() }}
-                                </span>
+                            <td class="num px-2 text-center text-ink-muted" data-percent="{{ $key }}">{{ $fmt($book->finalPercent($s)) }}%</td>
+                            <td class="num px-2 text-center text-lg font-bold {{ $complete ? '' : 'opacity-40' }}" data-final="{{ $key }}" title="{{ $complete ? '' : 'Provisional: faltan aspectos' }}">{{ $fmt($book->finalScore($s)) }}</td>
+                            <td class="px-4 text-center">
+                                <span class="chip {{ $complete ? 'chip-done' : 'chip-pending' }}" data-status="{{ $key }}">{{ $complete ? 'Completo' : 'Faltan '.$book->missingFor($s)->count() }}</span>
                             </td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
+            <p class="p-6 text-center text-ink-muted" data-search-empty hidden>Ningún alumno coincide.</p>
         </section>
-        <p class="mt-2 text-xs text-slate-500">Se guarda solo al salir de cada casilla. Enter baja al siguiente alumno. Deja vacío para marcar como pendiente; 0 es una calificación.</p>
+        <p class="mt-2 text-xs text-ink-muted">Toca una casilla para calificar. Una casilla con guion está pendiente; el 0 sí cuenta como calificación.</p>
     @endif
+
+    <x-slot:after><x-keypad /></x-slot:after>
 </x-layouts.app>

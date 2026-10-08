@@ -39,6 +39,7 @@ class GradeController extends Controller
         } else {
             Grade::updateOrCreate($key, ['score' => $data['score']]);
         }
+        $project->touch(); // "proyectos recientes" = los que se están calificando
 
         $book = Gradebook::for($project);
         $student = $book->students->firstWhere('id', $data['student_id']);
@@ -53,7 +54,9 @@ class GradeController extends Controller
                 'missing' => $book->missingFor($student)->count(),
             ],
             'criterion_missing' => $book->missingForCriterion($criterion),
+            'criterion_total' => $book->students->count(),
             'project' => [
+                'id' => $project->id,
                 'graded' => $book->gradedCells(),
                 'total' => $book->totalCells(),
                 'missing' => $book->missingCells(),

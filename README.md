@@ -4,7 +4,15 @@ App para que maestras registren proyectos, los evalúen con rúbricas ponderadas
 
 ## Cómo funciona
 
-- **Maestra → Grupos → Alumnos / Proyectos → Aspectos → Calificaciones.** Cada maestra solo ve sus grupos.
+- **Maestra → Grupo (máx. 2: matutino y vespertino) → Alumnos / Proyectos → Aspectos → Calificaciones.**
+  Cada maestra solo ve sus grupos. El selector de turno de la barra superior cambia de grupo.
+- Cada grupo guarda su **centro de trabajo**: escuela, CCT, zona escolar, grado, grupo y ciclo.
+- **Lista de alumnos desde Excel**: columnas `N.L.` y `Nombre` (o apellidos en columnas separadas). Hay plantilla.
+  Volver a subirla no duplica: solo actualiza números de lista. Nombres en MAYÚSCULAS se pasan a nombre propio.
+- **Captura tipo punto de venta**: proyectos y aspectos en tarjetas; al tocar una calificación se abre un teclado
+  0–10 que guarda con un tap y salta al siguiente alumno. Decimales con la tecla `0,0`.
+- **Buscador** por apellido, nombre o número de lista (sin importar acentos). Enter abre el primer resultado.
+- Modo claro / oscuro.
 - Cada proyecto tiene uno o varios **aspectos** con un **peso %** (deben sumar 100%).
 - Cada aspecto se califica de **0 a 10**. Aporta `calificación ÷ 10 × peso`. Ej.: un 8 en un aspecto de 20% = 16%.
   La suma es el % final; ÷ 10 = calificación final (0–10).

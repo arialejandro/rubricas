@@ -14,12 +14,12 @@ class ExportController extends Controller
 {
     public function group(Group $group): StreamedResponse
     {
-        return $this->download(ExcelExporter::forGroup($group), $group->name);
+        return $this->download(ExcelExporter::forGroup($group), 'calificaciones '.$group->label().' '.$group->shift);
     }
 
     public function project(Group $group, Project $project): StreamedResponse
     {
-        return $this->download(ExcelExporter::forProject($project), $group->name.' - '.$project->name);
+        return $this->download(ExcelExporter::forProject($project), $group->label().' '.$project->name);
     }
 
     private function download(Spreadsheet $book, string $name): StreamedResponse

@@ -33,6 +33,6 @@ class User extends Authenticatable
 
     public function groups(): HasMany
     {
-        return $this->hasMany(Group::class)->orderBy('name');
+        return $this->hasMany(Group::class)->orderBy('shift'); // matutino antes que vespertino
     }
 }

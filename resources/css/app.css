@@ -3,33 +3,122 @@
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
-@theme {
-    --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-    --color-brand-50: #eef4fb;
-    --color-brand-100: #d7e5f5;
-    --color-brand-600: #2b5d94;
-    --color-brand-700: #1e4a7a;
-    --color-brand-900: #1e3a5f;
+/* Modo oscuro por clase en <html> (lo pone resources/js/theme.js antes de pintar). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Tokens semánticos. Los componentes usan SOLO estos nombres (bg-surface, text-ink, border-line…),
+ * nunca colores crudos, así el modo oscuro se resuelve cambiando las variables de abajo.
+ */
+@theme inline {
+    --font-sans: 'Fira Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+    --color-canvas: var(--canvas);
+    --color-surface: var(--surface);
+    --color-surface-2: var(--surface-2);
+    --color-line: var(--line);
+    --color-ink: var(--ink);
+    --color-ink-muted: var(--ink-muted);
+    --color-primary: var(--primary);
+    --color-primary-strong: var(--primary-strong);
+    --color-primary-soft: var(--primary-soft);
+    --color-on-primary: var(--on-primary);
+    --color-pending: var(--pending);
+    --color-pending-soft: var(--pending-soft);
+    --color-done: var(--done);
+    --color-done-soft: var(--done-soft);
+    --color-danger: var(--danger);
+    --color-danger-soft: var(--danger-soft);
+}
+
+:root {
+    --canvas: #f3f6f6;
+    --surface: #ffffff;
+    --surface-2: #eef3f3;
+    --line: #d9e3e2;
+    --ink: #10201f;
+    --ink-muted: #556866;
+    --primary: #0f766e;
+    --primary-strong: #115e59;
+    --primary-soft: #d6f1ed;
+    --on-primary: #ffffff;
+    --pending: #c2410c;
+    --pending-soft: #ffedd5;
+    --done: #15803d;
+    --done-soft: #dcfce7;
+    --danger: #b91c1c;
+    --danger-soft: #fee2e2;
+    color-scheme: light;
+}
+
+.dark {
+    --canvas: #0b1213;
+    --surface: #121c1d;
+    --surface-2: #1a2728;
+    --line: #2a3a3b;
+    --ink: #e6efee;
+    --ink-muted: #9db0ae;
+    --primary: #2dd4bf;
+    --primary-strong: #5eead4;
+    --primary-soft: #123a37;
+    --on-primary: #04201d;
+    --pending: #fb923c;
+    --pending-soft: #3a2212;
+    --done: #4ade80;
+    --done-soft: #12301f;
+    --danger: #f87171;
+    --danger-soft: #3b1515;
+    color-scheme: dark;
+}
+
+@layer base {
+    html { -webkit-tap-highlight-color: transparent; }
+    body { @apply bg-canvas text-ink; font-feature-settings: 'tnum' 0; }
+    button, a, [role='button'], summary, label:has(input) { cursor: pointer; touch-action: manipulation; }
+    :focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+    /* Evita el zoom automático de iOS al enfocar campos (necesita >= 16px). */
+    input, select, textarea { font-size: 16px; }
 }
 
 @layer components {
-    .card { @apply rounded-2xl border border-slate-200 bg-white shadow-sm; }
-    .label { @apply mb-1 block text-sm font-medium text-slate-700; }
-    .input { @apply block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 shadow-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-100 focus:outline-none; }
-    .btn { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition select-none disabled:opacity-50; }
-    /* Se usan junto con .btn: class="btn btn-primary" (Tailwind 4 no permite @apply de clases propias). */
-    .btn-primary { @apply bg-brand-700 text-white hover:bg-brand-900 active:scale-[.98]; }
-    .btn-ghost { @apply border border-slate-300 bg-white text-slate-700 hover:bg-slate-50; }
-    .btn-danger { @apply border border-red-200 bg-white text-red-700 hover:bg-red-50; }
-    .chip { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+    .card { @apply rounded-2xl border border-line bg-surface; }
+    .label { @apply mb-1.5 block text-sm font-medium text-ink; }
+    .hint { @apply mt-1 text-xs text-ink-muted; }
+    .input { @apply block min-h-12 w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-base text-ink placeholder:text-ink-muted/70 focus:border-primary focus:ring-4 focus:ring-primary-soft focus:outline-none; }
+    .btn { @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold whitespace-nowrap transition duration-150 select-none active:scale-[.97] disabled:pointer-events-none disabled:opacity-45; }
+    /* Se combinan con .btn: class="btn btn-primary" (Tailwind 4 no hace @apply de clases propias). */
+    .btn-primary { @apply bg-primary text-on-primary hover:bg-primary-strong; }
+    .btn-ghost { @apply border border-line bg-surface text-ink hover:bg-surface-2; }
+    .btn-danger { @apply border border-danger/40 bg-surface text-danger hover:bg-danger-soft; }
+    .btn-icon { @apply size-12 px-0; }
+    .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap; }
+    .chip-pending { @apply bg-pending-soft text-pending; }
+    .chip-done { @apply bg-done-soft text-done; }
+    .chip-muted { @apply bg-surface-2 text-ink-muted; }
+    .num { font-variant-numeric: tabular-nums; }
 
-    /* Celda de calificación: estados que pinta el autoguardado (resources/js/app.js). */
-    .score-input { @apply w-16 rounded-lg border border-slate-300 bg-white px-1 py-2 text-center text-base font-semibold tabular-nums focus:border-brand-600 focus:ring-2 focus:ring-brand-100 focus:outline-none; }
-    .score-input.is-empty { @apply border-amber-300 bg-amber-50; }
-    .score-input.is-saving { @apply border-sky-400; }
-    .score-input.is-saved { @apply border-emerald-500 bg-emerald-50; }
-    .score-input.is-error { @apply border-red-500 bg-red-50 text-red-700; }
+    /* Tarjeta táctil (proyectos, aspectos): todo el bloque es el botón. */
+    .tile { @apply rounded-2xl border border-line bg-surface relative flex flex-col gap-3 p-4 text-left transition duration-150 hover:border-primary active:scale-[.98]; }
+
+    /* Botón de calificación que abre el teclado. Estados los pone resources/js/keypad.js. */
+    .score { @apply tabular-nums inline-grid min-h-12 min-w-14 place-items-center rounded-xl border-2 border-line bg-surface px-2 text-lg font-bold text-ink transition duration-150; }
+    .score[data-empty] { @apply border-dashed border-pending/60 bg-pending-soft text-pending; }
+    .score.is-active { @apply border-primary ring-4 ring-primary-soft; }
+    .score.is-saving { @apply opacity-60; }
+    .score.is-error { @apply border-danger bg-danger-soft text-danger; }
+
+    .key { @apply tabular-nums grid min-h-14 place-items-center rounded-2xl border border-line bg-surface text-2xl font-bold text-ink transition duration-100 select-none hover:bg-surface-2 active:scale-95 active:bg-primary-soft; }
 }
 
-/* Evita el zoom automático de iOS al enfocar inputs (necesita >= 16px). */
-input, select, textarea { font-size: 16px; }
+/* Con el teclado abierto en teléfono la hoja tapa el final de la lista: se deja espacio para hacer scroll. */
+@media (max-width: 767px) {
+    body.keypad-open #main { padding-bottom: 30rem; }
+}
+/* En iPad/escritorio el teclado flota a la derecha: el contenido se recorre para que no lo tape. */
+@media (min-width: 768px) {
+    body.keypad-open #main { padding-right: calc(380px + 3rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; }
+}

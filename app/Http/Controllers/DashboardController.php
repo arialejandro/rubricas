@@ -2,20 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Support\Gradebook;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 
+/** "/" lleva al tablero del turno activo (el último grupo visitado) o al alta del primero. */
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request): View
+    public function __invoke(Request $request): RedirectResponse
     {
-        $groups = $request->user()->groups()->withCount(['activeStudents', 'projects'])->get();
+        $groups = $request->user()->groups()->get();
 
-        $missing = $groups->mapWithKeys(fn ($g) => [
-            $g->id => array_sum(array_column(Gradebook::summaryForGroup($g), 'missing')),
-        ]);
+        if ($groups->isEmpty()) {
+            return redirect()->route('grupos.create');
+        }
 
-        return view('dashboard', compact('groups', 'missing'));
+        $group = $groups->firstWhere('id', $request->session()->get('group_id')) ?? $groups->first();
+
+        return redirect()->route('grupos.show', $group);
     }
 }

@@ -149,7 +149,90 @@ class RubricTest extends TestCase
         $this->group->students()->create(['name' => 'Ana']);
         $this->group->students()->create(['name' => 'Bruno', 'active' => false]);
 
-        $this->actingAs($this->teacher)->get(route('dashboard'))->assertSee('1 pendientes');
+        $this->actingAs($this->teacher)->get(route('grupos.show', $this->group))
+            ->assertOk()
+            ->assertSee('1 calificaciones por capturar');
+    }
+
+    public function test_excel_student_list_import_with_header_and_uppercase_names(): void
+    {
+        $book = new \PhpOffice\PhpSpreadsheet\Spreadsheet;
+        $book->getActiveSheet()->fromArray([
+            ['Lista 3°B'],
+            [],
+            ['N.L.', 'Apellido paterno', 'Apellido materno', 'Nombre(s)'],
+            [1, 'LÓPEZ', 'PÉREZ', 'ANA'],
+            [2, 'Díaz', 'Ruiz', 'Bruno'],
+        ]);
+        // Título arriba de los encabezados: se ignora porque no tiene columna de nombre.
+        $book->getActiveSheet()->removeRow(1, 2);
+        $path = tempnam(sys_get_temp_dir(), 'lista').'.xlsx';
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($book))->save($path);
+
+        $this->group->students()->create(['name' => 'Diaz Ruiz Bruno', 'list_number' => 9]);
+
+        $this->actingAs($this->teacher)
+            ->post(route('students.import', $this->group), [
+                'file' => new \Illuminate\Http\UploadedFile($path, 'lista.xlsx', null, null, true),
+            ])
+            ->assertRedirect(route('students.index', $this->group))
+            ->assertSessionHas('status', 'Lista cargada: 1 nuevos · 1 con N.L. actualizado.');
+
+        $this->assertSame(['López Pérez Ana' => 1, 'Diaz Ruiz Bruno' => 2], $this->group->students()->pluck('list_number', 'name')->all());
+        @unlink($path);
+    }
+
+    public function test_csv_without_header_is_number_and_name(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'lista');
+        file_put_contents($path, "1,Ana López\n2,Bruno Díaz\n");
+
+        $this->actingAs($this->teacher)
+            ->post(route('students.import', $this->group), [
+                'file' => new \Illuminate\Http\UploadedFile($path, 'lista.csv', 'text/csv', null, true),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(['Ana López', 'Bruno Díaz'], $this->group->students()->pluck('name')->all());
+        @unlink($path);
+    }
+
+    public function test_a_teacher_has_at_most_one_group_per_shift(): void
+    {
+        $payload = ['shift' => 'matutino', 'grade' => 4, 'name' => 'c', 'school_name' => 'Escuela'];
+
+        $this->actingAs($this->teacher)->post(route('grupos.store'), $payload)->assertSessionHasErrors('shift');
+
+        $this->actingAs($this->teacher)->post(route('grupos.store'), [...$payload, 'shift' => 'vespertino'])->assertSessionHasNoErrors();
+        $this->assertSame('C', $this->teacher->groups()->where('shift', 'vespertino')->value('name'));
+
+        $this->actingAs($this->teacher)->get(route('grupos.create'))->assertRedirect(route('dashboard'));
+        $this->actingAs($this->teacher)->post(route('grupos.store'), $payload)->assertStatus(422);
+    }
+
+    public function test_home_returns_to_last_visited_shift(): void
+    {
+        $evening = $this->teacher->groups()->create(['shift' => 'vespertino', 'name' => 'A', 'grade' => 5]);
+
+        $this->actingAs($this->teacher)->get(route('grupos.show', $evening))->assertOk();
+        $this->actingAs($this->teacher)->get(route('dashboard'))->assertRedirect(route('grupos.show', $evening));
+    }
+
+    public function test_main_screens_render(): void
+    {
+        $project = $this->projectWithCriteria();
+        $ana = $this->group->students()->create(['name' => 'Ana', 'list_number' => 1]);
+        $project->criteria[0]->grades()->create(['student_id' => $ana->id, 'score' => 9]);
+
+        $this->actingAs($this->teacher);
+        $this->get(route('grupos.show', $this->group))->assertOk()->assertSee('Proyectos recientes');
+        $this->get(route('projects.index', $this->group))->assertOk()->assertSee('Maqueta');
+        $this->get(route('projects.show', [$this->group, $project]))->assertOk()->assertSee('data-score-cell', false);
+        $this->get(route('capture', [$this->group, $project, $project->criteria[0]]))->assertOk()->assertSee('id="keypad"', false);
+        $this->get(route('students.index', $this->group))->assertOk()->assertSee('Subir Excel');
+        $this->get(route('students.show', [$this->group, $ana]))->assertOk()->assertSee('Faltan 1');
+        $this->get(route('students.template', $this->group))->assertOk();
+        $this->get(route('grupos.edit', $this->group))->assertOk()->assertSee('Zona escolar');
     }
 
     public function test_removing_graded_criterion_requires_confirmation(): void

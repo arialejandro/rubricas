@@ -1,6 +1,230 @@
 {
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-400-normal.woff": {
+    "file": "assets/fira-sans-cyrillic-400-normal-D9eUeF-O.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-400-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-400-normal.woff2": {
+    "file": "assets/fira-sans-cyrillic-400-normal-CKu2TFQr.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-400-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-500-normal.woff": {
+    "file": "assets/fira-sans-cyrillic-500-normal-Daski1k2.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-500-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-500-normal.woff2": {
+    "file": "assets/fira-sans-cyrillic-500-normal-CXfldnQ8.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-500-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-600-normal.woff": {
+    "file": "assets/fira-sans-cyrillic-600-normal-CJ5P9t7t.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-600-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-600-normal.woff2": {
+    "file": "assets/fira-sans-cyrillic-600-normal-JSBvCpTs.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-600-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-700-normal.woff": {
+    "file": "assets/fira-sans-cyrillic-700-normal-KyW5QH4H.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-700-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-700-normal.woff2": {
+    "file": "assets/fira-sans-cyrillic-700-normal-Bl-HczEO.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-700-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-400-normal.woff": {
+    "file": "assets/fira-sans-cyrillic-ext-400-normal-Dd5dApAy.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-400-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-400-normal.woff2": {
+    "file": "assets/fira-sans-cyrillic-ext-400-normal-Cycyekte.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-400-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-500-normal.woff": {
+    "file": "assets/fira-sans-cyrillic-ext-500-normal-Cixivk4R.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-500-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-500-normal.woff2": {
+    "file": "assets/fira-sans-cyrillic-ext-500-normal-Dkk5LlrU.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-500-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-600-normal.woff": {
+    "file": "assets/fira-sans-cyrillic-ext-600-normal-BKgjRriM.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-600-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-600-normal.woff2": {
+    "file": "assets/fira-sans-cyrillic-ext-600-normal-CE6oUZE1.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-600-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-700-normal.woff": {
+    "file": "assets/fira-sans-cyrillic-ext-700-normal-Gcpdxicj.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-700-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-700-normal.woff2": {
+    "file": "assets/fira-sans-cyrillic-ext-700-normal-BfO9TR-w.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-cyrillic-ext-700-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-400-normal.woff": {
+    "file": "assets/fira-sans-greek-400-normal-DQ8sF22y.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-400-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-400-normal.woff2": {
+    "file": "assets/fira-sans-greek-400-normal-BFCFncbp.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-400-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-500-normal.woff": {
+    "file": "assets/fira-sans-greek-500-normal-C9KT8sAy.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-500-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-500-normal.woff2": {
+    "file": "assets/fira-sans-greek-500-normal-Cy-TUuxE.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-500-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-600-normal.woff": {
+    "file": "assets/fira-sans-greek-600-normal-DfHu91YF.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-600-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-600-normal.woff2": {
+    "file": "assets/fira-sans-greek-600-normal-BlqpLOpF.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-600-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-700-normal.woff": {
+    "file": "assets/fira-sans-greek-700-normal-CJu31rC4.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-700-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-700-normal.woff2": {
+    "file": "assets/fira-sans-greek-700-normal-BVfcrbV7.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-700-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-400-normal.woff": {
+    "file": "assets/fira-sans-greek-ext-400-normal-ClCfNE6D.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-400-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-400-normal.woff2": {
+    "file": "assets/fira-sans-greek-ext-400-normal-ByG7UNQ2.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-400-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-500-normal.woff": {
+    "file": "assets/fira-sans-greek-ext-500-normal-Bem4H9fH.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-500-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-500-normal.woff2": {
+    "file": "assets/fira-sans-greek-ext-500-normal-nq-cjB3m.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-500-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-600-normal.woff": {
+    "file": "assets/fira-sans-greek-ext-600-normal-DPxZoeHL.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-600-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-600-normal.woff2": {
+    "file": "assets/fira-sans-greek-ext-600-normal-fS0evUH3.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-600-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-700-normal.woff": {
+    "file": "assets/fira-sans-greek-ext-700-normal-C8J5qYMq.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-700-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-700-normal.woff2": {
+    "file": "assets/fira-sans-greek-ext-700-normal-C1m6bE4Q.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-greek-ext-700-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-400-normal.woff": {
+    "file": "assets/fira-sans-latin-400-normal-66xCkunx.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-400-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-400-normal.woff2": {
+    "file": "assets/fira-sans-latin-400-normal-a0AnQzuD.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-400-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-500-normal.woff": {
+    "file": "assets/fira-sans-latin-500-normal-Bkfzcwmr.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-500-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-500-normal.woff2": {
+    "file": "assets/fira-sans-latin-500-normal-Bvbxc8ch.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-500-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-600-normal.woff": {
+    "file": "assets/fira-sans-latin-600-normal-DtSgd811.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-600-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-600-normal.woff2": {
+    "file": "assets/fira-sans-latin-600-normal-CXKlxLG9.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-600-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-700-normal.woff": {
+    "file": "assets/fira-sans-latin-700-normal-DgqLm3Fi.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-700-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-700-normal.woff2": {
+    "file": "assets/fira-sans-latin-700-normal-CRhwpWTq.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-700-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-400-normal.woff": {
+    "file": "assets/fira-sans-latin-ext-400-normal-BCUwhuGB.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-400-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-400-normal.woff2": {
+    "file": "assets/fira-sans-latin-ext-400-normal-BLG_mAEf.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-400-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-500-normal.woff": {
+    "file": "assets/fira-sans-latin-ext-500-normal-CFRf4jcC.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-500-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-500-normal.woff2": {
+    "file": "assets/fira-sans-latin-ext-500-normal-OO1QnNpY.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-500-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-600-normal.woff": {
+    "file": "assets/fira-sans-latin-ext-600-normal-DLMQsaV4.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-600-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-600-normal.woff2": {
+    "file": "assets/fira-sans-latin-ext-600-normal-DTQBTt1m.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-600-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-700-normal.woff": {
+    "file": "assets/fira-sans-latin-ext-700-normal-cfTxGFzJ.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-700-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-700-normal.woff2": {
+    "file": "assets/fira-sans-latin-ext-700-normal-g2Yrd4J5.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-latin-ext-700-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-400-normal.woff": {
+    "file": "assets/fira-sans-vietnamese-400-normal-DUVG35gE.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-400-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-400-normal.woff2": {
+    "file": "assets/fira-sans-vietnamese-400-normal-ljDTQFsx.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-400-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-500-normal.woff": {
+    "file": "assets/fira-sans-vietnamese-500-normal-UV7M6ot_.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-500-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-500-normal.woff2": {
+    "file": "assets/fira-sans-vietnamese-500-normal-ChEXCnJy.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-500-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-600-normal.woff": {
+    "file": "assets/fira-sans-vietnamese-600-normal-Bxjaclsw.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-600-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-600-normal.woff2": {
+    "file": "assets/fira-sans-vietnamese-600-normal-Dh2KAvU8.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-600-normal.woff2"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-700-normal.woff": {
+    "file": "assets/fira-sans-vietnamese-700-normal-DFi88MGY.woff",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-700-normal.woff"
+  },
+  "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-700-normal.woff2": {
+    "file": "assets/fira-sans-vietnamese-700-normal-j5oLGLJY.woff2",
+    "src": "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-700-normal.woff2"
+  },
   "resources/css/app.css": {
-    "file": "assets/app-xgET46w-.css",
+    "file": "assets/app-C1s-W8DR.css",
     "name": "app",
     "names": [
       "app.css"
@@ -9,9 +233,70 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-B9pVwn7r.js",
+    "file": "assets/app-CISGS5m-.js",
     "name": "app",
     "src": "resources/js/app.js",
-    "isEntry": true
+    "isEntry": true,
+    "css": [
+      "assets/app-B9DNyh7J.css"
+    ],
+    "assets": [
+      "assets/fira-sans-cyrillic-ext-400-normal-Cycyekte.woff2",
+      "assets/fira-sans-cyrillic-ext-400-normal-Dd5dApAy.woff",
+      "assets/fira-sans-cyrillic-400-normal-CKu2TFQr.woff2",
+      "assets/fira-sans-cyrillic-400-normal-D9eUeF-O.woff",
+      "assets/fira-sans-greek-ext-400-normal-ByG7UNQ2.woff2",
+      "assets/fira-sans-greek-ext-400-normal-ClCfNE6D.woff",
+      "assets/fira-sans-greek-400-normal-BFCFncbp.woff2",
+      "assets/fira-sans-greek-400-normal-DQ8sF22y.woff",
+      "assets/fira-sans-vietnamese-400-normal-ljDTQFsx.woff2",
+      "assets/fira-sans-vietnamese-400-normal-DUVG35gE.woff",
+      "assets/fira-sans-latin-ext-400-normal-BLG_mAEf.woff2",
+      "assets/fira-sans-latin-ext-400-normal-BCUwhuGB.woff",
+      "assets/fira-sans-latin-400-normal-a0AnQzuD.woff2",
+      "assets/fira-sans-latin-400-normal-66xCkunx.woff",
+      "assets/fira-sans-cyrillic-ext-500-normal-Dkk5LlrU.woff2",
+      "assets/fira-sans-cyrillic-ext-500-normal-Cixivk4R.woff",
+      "assets/fira-sans-cyrillic-500-normal-CXfldnQ8.woff2",
+      "assets/fira-sans-cyrillic-500-normal-Daski1k2.woff",
+      "assets/fira-sans-greek-ext-500-normal-nq-cjB3m.woff2",
+      "assets/fira-sans-greek-ext-500-normal-Bem4H9fH.woff",
+      "assets/fira-sans-greek-500-normal-Cy-TUuxE.woff2",
+      "assets/fira-sans-greek-500-normal-C9KT8sAy.woff",
+      "assets/fira-sans-vietnamese-500-normal-ChEXCnJy.woff2",
+      "assets/fira-sans-vietnamese-500-normal-UV7M6ot_.woff",
+      "assets/fira-sans-latin-ext-500-normal-OO1QnNpY.woff2",
+      "assets/fira-sans-latin-ext-500-normal-CFRf4jcC.woff",
+      "assets/fira-sans-latin-500-normal-Bvbxc8ch.woff2",
+      "assets/fira-sans-latin-500-normal-Bkfzcwmr.woff",
+      "assets/fira-sans-cyrillic-ext-600-normal-CE6oUZE1.woff2",
+      "assets/fira-sans-cyrillic-ext-600-normal-BKgjRriM.woff",
+      "assets/fira-sans-cyrillic-600-normal-JSBvCpTs.woff2",
+      "assets/fira-sans-cyrillic-600-normal-CJ5P9t7t.woff",
+      "assets/fira-sans-greek-ext-600-normal-fS0evUH3.woff2",
+      "assets/fira-sans-greek-ext-600-normal-DPxZoeHL.woff",
+      "assets/fira-sans-greek-600-normal-BlqpLOpF.woff2",
+      "assets/fira-sans-greek-600-normal-DfHu91YF.woff",
+      "assets/fira-sans-vietnamese-600-normal-Dh2KAvU8.woff2",
+      "assets/fira-sans-vietnamese-600-normal-Bxjaclsw.woff",
+      "assets/fira-sans-latin-ext-600-normal-DTQBTt1m.woff2",
+      "assets/fira-sans-latin-ext-600-normal-DLMQsaV4.woff",
+      "assets/fira-sans-latin-600-normal-CXKlxLG9.woff2",
+      "assets/fira-sans-latin-600-normal-DtSgd811.woff",
+      "assets/fira-sans-cyrillic-ext-700-normal-BfO9TR-w.woff2",
+      "assets/fira-sans-cyrillic-ext-700-normal-Gcpdxicj.woff",
+      "assets/fira-sans-cyrillic-700-normal-Bl-HczEO.woff2",
+      "assets/fira-sans-cyrillic-700-normal-KyW5QH4H.woff",
+      "assets/fira-sans-greek-ext-700-normal-C1m6bE4Q.woff2",
+      "assets/fira-sans-greek-ext-700-normal-C8J5qYMq.woff",
+      "assets/fira-sans-greek-700-normal-BVfcrbV7.woff2",
+      "assets/fira-sans-greek-700-normal-CJu31rC4.woff",
+      "assets/fira-sans-vietnamese-700-normal-j5oLGLJY.woff2",
+      "assets/fira-sans-vietnamese-700-normal-DFi88MGY.woff",
+      "assets/fira-sans-latin-ext-700-normal-g2Yrd4J5.woff2",
+      "assets/fira-sans-latin-ext-700-normal-cfTxGFzJ.woff",
+      "assets/fira-sans-latin-700-normal-CRhwpWTq.woff2",
+      "assets/fira-sans-latin-700-normal-DgqLm3Fi.woff"
+    ]
   }
 }

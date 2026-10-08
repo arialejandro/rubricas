@@ -86,7 +86,7 @@ class ExcelExporter
         $lastL = Coordinate::stringFromColumnIndex($lastScoreCol);
 
         $sheet->setCellValue('A1', $project->name)->getStyle('A1')->getFont()->setBold(true)->setSize(14);
-        $sheet->setCellValue('A2', 'Grupo: '.$project->group->name.($project->due_date ? '   ·   Fecha: '.$project->due_date->format('d/m/Y') : ''));
+        $sheet->setCellValue('A2', self::groupLine($project->group).($project->due_date ? '   ·   Fecha: '.$project->due_date->format('d/m/Y') : ''));
         $sheet->setCellValue('A3', 'Cada aspecto se califica de 0 a 10 y aporta (calificación ÷ 10) × su peso. Celdas amarillas = sin calificar.');
         $sheet->getStyle('A3')->getFont()->setItalic(true)->setSize(9);
 
@@ -155,9 +155,9 @@ class ExcelExporter
     private function summarySheet(Worksheet $sheet, Group $group, $books, array $refs): void
     {
         $sheet->setTitle($this->sheetTitle('Resumen'));
-        $sheet->setCellValue('A1', 'Resumen · '.$group->name.($group->school_year ? ' ('.$group->school_year.')' : ''));
+        $sheet->setCellValue('A1', 'Resumen · '.($group->school_name ?: $group->label()));
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
-        $sheet->setCellValue('A2', 'Calificación final (0–10) por proyecto. Generado el '.now()->format('d/m/Y H:i'));
+        $sheet->setCellValue('A2', self::groupLine($group).'   ·   Calificación final (0–10) por proyecto. Generado el '.now()->format('d/m/Y H:i'));
         $sheet->getStyle('A2')->getFont()->setItalic(true)->setSize(9);
 
         $sheet->setCellValue('A4', 'No.');
@@ -234,6 +234,18 @@ class ExcelExporter
             $sheet->getColumnDimension($col)->setWidth($w);
         }
         $sheet->freezePane('A2');
+    }
+
+    /** "Grupo 3° B · Matutino · CCT 09DPR… · Zona 015 · 2026-2027" */
+    private static function groupLine(Group $group): string
+    {
+        return implode('   ·   ', array_filter([
+            'Grupo '.$group->label(),
+            $group->shiftLabel(),
+            $group->school_cct ? 'CCT '.$group->school_cct : null,
+            $group->school_zone ? 'Zona '.$group->school_zone : null,
+            $group->school_year,
+        ]));
     }
 
     private function styleHeader(Worksheet $sheet, string $range): void

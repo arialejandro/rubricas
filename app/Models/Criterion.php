@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Criterion extends Model
 {
     protected $table = 'criteria';
-
     protected function casts(): array
     {
         return ['weight' => 'float'];

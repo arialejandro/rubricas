@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Group;
 use App\Models\Project;
 use App\Support\Gradebook;
+use App\Support\GroupOverview;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,13 @@ use Illuminate\View\View;
 
 class ProjectController extends Controller
 {
+    public function index(Group $group): View
+    {
+        $overview = GroupOverview::for($group);
+
+        return view('projects.index', compact('group', 'overview'));
+    }
+
     public function create(Group $group): View
     {
         $project = new Project;
@@ -88,7 +96,7 @@ class ProjectController extends Controller
 
         $project->delete();
 
-        return redirect()->route('grupos.show', $group)->with('status', 'Proyecto eliminado.');
+        return redirect()->route('projects.index', $group)->with('status', 'Proyecto eliminado.');
     }
 
     /** @return array{0: array, 1: array<int, array{id:?int, name:string, weight:float}>} */

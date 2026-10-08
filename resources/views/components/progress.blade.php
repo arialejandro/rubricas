@@ -1,7 +1,6 @@
-@props(['graded' => 0, 'total' => 0, 'live' => false])
-@php($pct = $total > 0 ? (int) floor($graded * 100 / $total) : 0)
-<div {{ $attributes->merge(['class' => 'h-2.5 w-full overflow-hidden rounded-full bg-slate-200']) }}>
-    <div @if ($live) data-project-bar @endif
-         class="h-full rounded-full transition-all {{ $total > 0 && $graded >= $total ? 'bg-emerald-500' : 'bg-brand-600' }}"
-         style="width: {{ $pct }}%"></div>
+@props(['value' => 0, 'project' => null, 'criterion' => null])
+<div {{ $attributes->merge(['class' => 'h-2 w-full overflow-hidden rounded-full bg-surface-2']) }} role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $value }}">
+    <div @if ($project) data-project-bar="{{ $project }}" @endif @if ($criterion) data-criterion-bar="{{ $criterion }}" @endif
+         class="h-full rounded-full transition-[width] duration-300 {{ $value >= 100 ? 'bg-done' : 'bg-primary' }}"
+         style="width: {{ $value }}%"></div>
 </div>

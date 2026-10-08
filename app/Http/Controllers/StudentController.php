@@ -2,64 +2,82 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Grade;
 use App\Models\Group;
 use App\Models\Student;
+use App\Support\Gradebook;
+use App\Support\GroupOverview;
+use App\Support\StudentListImporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class StudentController extends Controller
 {
     public function index(Group $group): View
     {
-        $students = $group->students()->withCount('grades')->get();
+        $overview = GroupOverview::for($group);
+        $students = $group->students()->get();
+        $missing = $overview->students->mapWithKeys(fn ($s) => [$s->id => $overview->missingForStudent($s)]);
+        $averages = $overview->students->mapWithKeys(fn ($s) => [$s->id => $overview->averageForStudent($s)]);
 
-        return view('students.index', compact('group', 'students'));
+        return view('students.index', compact('group', 'students', 'missing', 'averages'));
     }
 
-    /**
-     * Alta en lote: un alumno por renglón (se puede pegar la lista desde Excel/WhatsApp).
-     * Acepta "12. Ana López", "12 Ana López", "12<TAB>Ana López" o solo el nombre.
-     */
+    /** Ficha del alumno: todas sus calificaciones por proyecto, capturables con el teclado. */
+    public function show(Group $group, Student $student): View
+    {
+        $projects = $group->projects()->with('criteria')->get();
+        $scores = Grade::where('student_id', $student->id)
+            ->whereIn('criterion_id', $projects->flatMap->criteria->pluck('id'))
+            ->pluck('score', 'criterion_id')
+            ->all();
+
+        $rows = $projects->map(fn ($p) => [
+            'project' => $p,
+            'percent' => Gradebook::percentFrom($p->criteria, $scores),
+            'missing' => $p->criteria->filter(fn ($c) => ! isset($scores[$c->id]))->count(),
+        ]);
+
+        return view('students.show', compact('group', 'student', 'rows', 'scores'));
+    }
+
+    /** Alta pegando texto (respaldo del Excel). */
     public function store(Request $request, Group $group): RedirectResponse
     {
         $request->validate(['names' => ['required', 'string', 'max:20000']]);
 
-        $existing = $group->students()->pluck('name')->map(fn ($n) => Str::lower($n))->flip();
-        $added = 0;
-        $skipped = [];
+        return $this->report($group, StudentListImporter::fromText($request->input('names')));
+    }
 
-        foreach (preg_split('/\R/', $request->input('names')) as $line) {
-            $line = trim(preg_replace('/\s+/u', ' ', $line));
-            if ($line === '') {
-                continue;
-            }
+    public function import(Request $request, Group $group): RedirectResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'max:2048', 'extensions:xlsx,xls,csv'],
+        ], [
+            'file.required' => 'Elige el archivo de Excel con la lista.',
+            'file.extensions' => 'El archivo debe ser Excel (.xlsx, .xls) o .csv.',
+        ]);
 
-            $number = null;
-            if (preg_match('/^(\d{1,3})[\s.\-)]+(.+)$/u', $line, $m)) {
-                $number = (int) $m[1];
-                $line = trim($m[2]);
-            }
-
-            $name = Str::limit($line, 250, '');
-            if ($existing->has(Str::lower($name))) {
-                $skipped[] = $name;
-                continue;
-            }
-
-            $group->students()->create(['name' => $name, 'list_number' => $number]);
-            $existing[Str::lower($name)] = true;
-            $added++;
+        try {
+            $rows = StudentListImporter::fromUpload($request->file('file'));
+        } catch (Throwable) {
+            return back()->withErrors(['file' => 'No se pudo leer el archivo. Revisa que sea un Excel válido o usa la plantilla.']);
         }
 
-        $msg = $added === 1 ? 'Se agregó 1 alumno.' : "Se agregaron {$added} alumnos.";
-        if ($skipped) {
-            $msg .= ' Ya existían (no se duplicaron): '.implode(', ', $skipped).'.';
-        }
+        return $this->report($group, $rows);
+    }
 
-        return back()->with('status', $msg);
+    public function template(Group $group): StreamedResponse
+    {
+        return response()->streamDownload(
+            fn () => (new Xlsx(StudentListImporter::template()))->save('php://output'),
+            'plantilla-alumnos.xlsx',
+        );
     }
 
     public function update(Request $request, Group $group, Student $student): RedirectResponse
@@ -83,6 +101,22 @@ class StudentController extends Controller
 
         $student->delete();
 
-        return back()->with('status', 'Alumno eliminado.');
+        return redirect()->route('students.index', $group)->with('status', 'Alumno eliminado.');
+    }
+
+    private function report(Group $group, array $rows): RedirectResponse
+    {
+        if ($rows === []) {
+            return back()->withErrors(['file' => 'No se encontraron nombres. La lista necesita una columna "Nombre" (y opcional "N.L.").']);
+        }
+
+        $r = StudentListImporter::apply($group, $rows);
+        $parts = array_filter([
+            $r['added'] ? "{$r['added']} nuevos" : null,
+            $r['updated'] ? "{$r['updated']} con N.L. actualizado" : null,
+            $r['unchanged'] ? "{$r['unchanged']} ya estaban" : null,
+        ]);
+
+        return redirect()->route('students.index', $group)->with('status', 'Lista cargada: '.implode(' · ', $parts).'.');
     }
 }

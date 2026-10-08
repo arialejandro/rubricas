@@ -1,9 +1,9 @@
 <x-layouts.app title="Entrar">
-    <div class="mx-auto mt-8 max-w-sm sm:mt-16">
+    <div class="mx-auto mt-6 max-w-sm sm:mt-16">
         <div class="mb-6 text-center">
-            <div class="mx-auto mb-3 grid size-14 place-items-center rounded-2xl bg-brand-900 text-2xl text-white">✓</div>
+            <div class="mx-auto mb-3 grid size-16 place-items-center rounded-2xl bg-primary text-on-primary"><x-icon name="clipboard" class="size-8" /></div>
             <h1 class="text-2xl font-bold">{{ config('app.name') }}</h1>
-            <p class="text-sm text-slate-500">Proyectos, rúbricas y calificaciones</p>
+            <p class="text-ink-muted">Proyectos, rúbricas y calificaciones</p>
         </div>
 
         <form method="POST" action="{{ route('login') }}" class="card space-y-4 p-6">
@@ -20,7 +20,11 @@
         </form>
 
         @if (config('rubrica.registration'))
-            <p class="mt-4 text-center text-sm text-slate-600">¿No tienes cuenta? <a class="font-semibold text-brand-700" href="{{ route('register') }}">Crear cuenta</a></p>
+            <p class="mt-4 text-center text-sm text-ink-muted">¿No tienes cuenta? <a class="font-semibold text-primary" href="{{ route('register') }}">Crear cuenta</a></p>
         @endif
+
+        <button type="button" class="btn btn-ghost mx-auto mt-6 flex" data-theme-toggle aria-label="Cambiar modo claro u oscuro">
+            <x-icon name="moon" class="size-4 dark:hidden" /><x-icon name="sun" class="hidden size-4 dark:block" /> Modo claro / oscuro
+        </button>
     </div>
 </x-layouts.app>

@@ -22,19 +22,21 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/', DashboardController::class)->name('dashboard');
 
-    // {group} solo resuelve grupos de la maestra en sesión (ver AppServiceProvider);
-    // scopeBindings obliga a que proyecto/alumno/aspecto pertenezcan a ese grupo.
+    // {group} solo resuelve grupos de la maestra en sesión y lo marca como turno activo
+    // (ver AppServiceProvider); scopeBindings obliga a que lo anidado pertenezca a ese grupo.
     Route::resource('grupos', GroupController::class)->parameters(['grupos' => 'group'])->except('index');
 
     Route::scopeBindings()->prefix('grupos/{group}')->group(function () {
         Route::get('alumnos', [StudentController::class, 'index'])->name('students.index');
         Route::post('alumnos', [StudentController::class, 'store'])->name('students.store');
+        Route::post('alumnos/importar', [StudentController::class, 'import'])->name('students.import');
+        Route::get('alumnos/plantilla', [StudentController::class, 'template'])->name('students.template');
+        Route::get('alumnos/{student}', [StudentController::class, 'show'])->name('students.show');
         Route::put('alumnos/{student}', [StudentController::class, 'update'])->name('students.update');
         Route::delete('alumnos/{student}', [StudentController::class, 'destroy'])->name('students.destroy');
 
         Route::resource('proyectos', ProjectController::class)
             ->parameters(['proyectos' => 'project'])
-            ->except('index')
             ->names('projects');
 
         Route::get('proyectos/{project}/capturar/{criterion}', CaptureController::class)->name('capture');

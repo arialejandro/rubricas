@@ -4,53 +4,133 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#1e3a5f">
+    <meta name="theme-color" content="#0f766e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>{{ isset($title) ? $title.' · ' : '' }}{{ config('app.name') }}</title>
+    {{-- Aplica el tema guardado antes de pintar para que no "parpadee" en claro. --}}
+    <script>
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem('theme'); } catch (e) {}
+            if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen bg-slate-100 text-slate-900 antialiased">
+<body class="min-h-dvh antialiased">
+    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2">Ir al contenido</a>
+
     @auth
-        <header class="sticky top-0 z-30 bg-brand-900 text-white shadow">
-            <div class="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
-                <a href="{{ route('dashboard') }}" class="flex items-center gap-2 text-lg font-bold">
-                    <span class="grid size-8 place-items-center rounded-lg bg-white/15">✓</span>
-                    {{ config('app.name') }}
+        @php
+            $nav = isset($navGroup) && $navGroup ? [
+                ['route' => route('grupos.show', $navGroup), 'active' => request()->routeIs('grupos.show'), 'icon' => 'home', 'label' => 'Inicio'],
+                ['route' => route('projects.index', $navGroup), 'active' => request()->routeIs('projects.*', 'capture'), 'icon' => 'folder', 'label' => 'Proyectos'],
+                ['route' => route('students.index', $navGroup), 'active' => request()->routeIs('students.*'), 'icon' => 'users', 'label' => 'Alumnos'],
+                ['route' => route('export.group', $navGroup), 'active' => false, 'icon' => 'sheet', 'label' => 'Excel'],
+            ] : [];
+        @endphp
+
+        <header class="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur pt-[env(safe-area-inset-top)]">
+            <div class="mx-auto flex max-w-7xl items-center gap-2 px-4 py-2.5 sm:gap-4">
+                <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 font-bold" aria-label="Inicio">
+                    <span class="grid size-10 place-items-center rounded-xl bg-primary text-on-primary"><x-icon name="clipboard" /></span>
+                    <span class="hidden leading-tight sm:block">
+                        {{ config('app.name') }}
+                        @if (isset($navGroup) && $navGroup)
+                            <span class="block text-xs font-medium text-ink-muted">{{ $navGroup->label() }} · {{ $navGroup->shiftLabel() }}</span>
+                        @endif
+                    </span>
                 </a>
-                <div class="flex items-center gap-3 text-sm">
-                    <span class="hidden text-white/80 sm:inline">{{ auth()->user()->name }}</span>
+
+                @if ($nav)
+                    <nav class="ml-4 hidden items-center gap-1 lg:flex" aria-label="Principal">
+                        @foreach ($nav as $item)
+                            <a href="{{ $item['route'] }}" @class(['flex min-h-11 items-center gap-2 rounded-xl px-3.5 text-sm font-semibold transition',
+                                'bg-primary-soft text-primary' => $item['active'], 'text-ink-muted hover:bg-surface-2 hover:text-ink' => ! $item['active']])
+                               @if ($item['active']) aria-current="page" @endif>
+                                <x-icon :name="$item['icon']" /> {{ $item['label'] }}
+                            </a>
+                        @endforeach
+                    </nav>
+                @endif
+
+                <div class="ml-auto flex items-center gap-2">
+                    {{-- Selector de turno: cada turno es un grupo; el que no existe ofrece crearlo. --}}
+                    @if (isset($navGroups) && $navGroups->isNotEmpty())
+                        <div class="flex rounded-xl border border-line bg-surface-2 p-1" role="group" aria-label="Turno">
+                            @foreach (\App\Models\Group::SHIFTS as $shift => $shiftLabel)
+                                @php($g = $navGroups->get($shift))
+                                @php($on = $navGroup && $navGroup->shift === $shift)
+                                <a href="{{ $g ? route('grupos.show', $g) : route('grupos.create', ['shift' => $shift]) }}"
+                                   @class(['flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-sm font-semibold transition sm:px-3',
+                                       'bg-surface text-ink shadow-sm' => $on, 'text-ink-muted hover:text-ink' => ! $on])
+                                   @if ($on) aria-current="true" @endif
+                                   title="{{ $g ? $shiftLabel.' · '.$g->label() : 'Agregar grupo '.$shiftLabel }}">
+                                    <x-icon :name="$shift === 'matutino' ? 'sun' : 'sunset'" class="size-4" />
+                                    <span class="hidden sm:inline">{{ $shiftLabel }}</span>
+                                    @unless ($g) <x-icon name="plus" class="size-3.5" /> @endunless
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <button type="button" class="btn btn-ghost btn-icon" data-theme-toggle aria-label="Cambiar modo claro u oscuro">
+                        <x-icon name="moon" class="dark:hidden" />
+                        <x-icon name="sun" class="hidden dark:block" />
+                    </button>
+
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button class="rounded-lg px-3 py-2 text-white/90 hover:bg-white/10">Salir</button>
+                        <button class="btn btn-ghost btn-icon" aria-label="Cerrar sesión" title="Cerrar sesión ({{ auth()->user()->name }})"><x-icon name="logout" /></button>
                     </form>
                 </div>
             </div>
         </header>
     @endauth
 
-    <main class="mx-auto max-w-7xl px-4 py-5 pb-24 sm:py-8">
+    <main id="main" @class(['mx-auto max-w-7xl px-4 py-5 sm:py-7', 'pb-28 lg:pb-10' => ! empty($nav)])>
         @isset($breadcrumbs)
-            <nav class="mb-3 flex flex-wrap items-center gap-1 text-sm text-slate-500">
+            <nav class="mb-3 flex flex-wrap items-center gap-1.5 text-sm text-ink-muted" aria-label="Ruta">
                 {{ $breadcrumbs }}
             </nav>
         @endisset
 
         @if (session('status'))
-            <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ session('status') }}</div>
+            <div class="mb-4 flex items-start gap-2 rounded-xl border border-done/30 bg-done-soft px-4 py-3 text-sm font-medium text-done" role="status">
+                <x-icon name="check" class="mt-0.5 size-4" /> {{ session('status') }}
+            </div>
         @endif
         @if ($errors->any())
-            <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                <ul class="list-inside list-disc space-y-0.5">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+            <div class="mb-4 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger" role="alert">
+                @foreach ($errors->all() as $error)
+                    <p class="flex items-start gap-2"><x-icon name="alert" class="mt-0.5 size-4" /> {{ $error }}</p>
+                @endforeach
             </div>
         @endif
 
         {{ $slot }}
     </main>
 
-    <div id="toast" class="fixed inset-x-4 bottom-4 z-50 mx-auto hidden max-w-md rounded-xl bg-slate-900 px-4 py-3 text-center text-sm text-white shadow-lg" role="status"></div>
+    @if (! empty($nav))
+        {{-- Pestañas inferiores en teléfono/iPad: el pulgar llega sin estirarse. --}}
+        <nav class="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Principal">
+            <div class="mx-auto grid max-w-xl grid-cols-4">
+                @foreach ($nav as $item)
+                    <a href="{{ $item['route'] }}" @class(['flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-semibold',
+                        'text-primary' => $item['active'], 'text-ink-muted' => ! $item['active']])
+                       @if ($item['active']) aria-current="page" @endif>
+                        <x-icon :name="$item['icon']" class="size-6" />
+                        {{ $item['label'] }}
+                    </a>
+                @endforeach
+            </div>
+        </nav>
+    @endif
+
+    <div id="toast" class="fixed inset-x-4 bottom-24 z-50 mx-auto hidden max-w-md rounded-xl bg-ink px-4 py-3 text-center text-sm font-medium text-canvas shadow-lg lg:bottom-6" role="status" aria-live="polite"></div>
+
+    {{ $after ?? '' }}
 </body>
 </html>
