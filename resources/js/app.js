@@ -40,46 +40,59 @@ document.querySelectorAll('[data-autosubmit]').forEach((input) => {
     });
 });
 
-// Editor de aspectos de la rúbrica (projects/form): agregar/quitar renglones y sumar pesos.
-const criteriaEditor = document.querySelector('[data-criteria-editor]');
-if (criteriaEditor) {
-    const list = criteriaEditor.querySelector('[data-criteria-list]');
-    const template = criteriaEditor.querySelector('template');
-    const total = criteriaEditor.querySelector('[data-weight-total]');
-    const bar = criteriaEditor.querySelector('[data-weight-bar]');
-    let index = list.children.length;
+/*
+ * Renglones repetibles (aspectos del campo, materias, PDA, criterios de un producto):
+ *   <section data-repeater data-max="6">
+ *     <div data-repeater-list> …renglones [data-repeater-row]… </div>
+ *     <template> renglón con __INDEX__ </template>
+ *     <button data-repeater-add>   <button data-repeater-remove> (dentro del renglón)
+ *   Si hay [data-weight] + [data-weight-total]/[data-weight-bar], suma los % en vivo (deben dar 100).
+ */
+document.querySelectorAll('[data-repeater]').forEach((editor) => {
+    const list = editor.querySelector('[data-repeater-list]');
+    const template = editor.querySelector(':scope > template');
+    const add = editor.querySelector('[data-repeater-add]');
+    const max = Number(editor.dataset.max || 99);
+    const total = editor.querySelector('[data-weight-total]');
+    const bar = editor.querySelector('[data-weight-bar]');
+    let index = list.querySelectorAll('[data-repeater-row]').length + 100;
 
-    const recalc = () => {
+    const refresh = () => {
+        const rows = list.querySelectorAll('[data-repeater-row]').length;
+        if (add) add.disabled = rows >= max;
+        if (!total) return;
         const sum = [...list.querySelectorAll('[data-weight]')].reduce((acc, el) => acc + (Number(normalize(el.value).replace(',', '.')) || 0), 0);
         const rounded = Math.round(sum * 100) / 100;
         total.textContent = `${fmt(rounded)}%`;
         total.classList.toggle('text-done', rounded === 100);
         total.classList.toggle('text-pending', rounded !== 100);
-        bar.style.width = `${Math.min(rounded, 100)}%`;
-        bar.classList.toggle('bg-done', rounded === 100);
-        bar.classList.toggle('bg-pending', rounded !== 100);
+        if (bar) {
+            bar.style.width = `${Math.min(rounded, 100)}%`;
+            bar.classList.toggle('bg-done', rounded === 100);
+            bar.classList.toggle('bg-pending', rounded !== 100);
+        }
     };
 
-    // Repartir 100% en partes iguales entre los aspectos.
-    criteriaEditor.querySelector('[data-split-even]')?.addEventListener('click', () => {
+    // Repartir 100% en partes iguales.
+    editor.querySelector('[data-split-even]')?.addEventListener('click', () => {
         const inputs = [...list.querySelectorAll('[data-weight]')];
         if (!inputs.length) return;
         const each = Math.floor((100 / inputs.length) * 100) / 100;
         inputs.forEach((el, i) => (el.value = i === inputs.length - 1 ? fmt(100 - each * (inputs.length - 1)) : fmt(each)));
-        recalc();
+        refresh();
     });
 
-    criteriaEditor.querySelector('[data-add-criterion]').addEventListener('click', () => {
+    add?.addEventListener('click', () => {
         list.insertAdjacentHTML('beforeend', template.innerHTML.replaceAll('__INDEX__', index++));
-        list.lastElementChild.querySelector('input:not([type=hidden])')?.focus();
-        recalc();
+        list.lastElementChild.querySelector('input:not([type=hidden]), textarea')?.focus();
+        refresh();
     });
     list.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-remove-criterion]');
+        const btn = e.target.closest('[data-repeater-remove]');
         if (!btn) return;
-        btn.closest('[data-criterion-row]').remove();
-        recalc();
+        btn.closest('[data-repeater-row]').remove();
+        refresh();
     });
-    list.addEventListener('input', recalc);
-    recalc();
-}
+    list.addEventListener('input', refresh);
+    refresh();
+});

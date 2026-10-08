@@ -30,7 +30,8 @@
         @php
             $nav = isset($navGroup) && $navGroup ? [
                 ['route' => route('grupos.show', $navGroup), 'active' => request()->routeIs('grupos.show'), 'icon' => 'home', 'label' => 'Inicio'],
-                ['route' => route('projects.index', $navGroup), 'active' => request()->routeIs('projects.*', 'capture'), 'icon' => 'folder', 'label' => 'Proyectos'],
+                ['route' => route('campos.index', $navGroup), 'active' => request()->routeIs('campos.*', 'capture.aspect', 'capture.subject'), 'icon' => 'chart', 'label' => 'Campos'],
+                ['route' => route('projects.index', $navGroup), 'active' => request()->routeIs('projects.*', 'products.*', 'capture.criterion'), 'icon' => 'folder', 'label' => 'Proyectos'],
                 ['route' => route('students.index', $navGroup), 'active' => request()->routeIs('students.*'), 'icon' => 'users', 'label' => 'Alumnos'],
                 ['route' => route('export.group', $navGroup), 'active' => false, 'icon' => 'sheet', 'label' => 'Excel'],
             ] : [];
@@ -81,11 +82,16 @@
     @endauth
 
     <main id="main" @class(['mx-auto max-w-7xl px-4 py-5 sm:py-7', 'pb-28 lg:pb-10' => ! empty($nav)])>
-        @isset($breadcrumbs)
-            <nav class="mb-3 flex flex-wrap items-center gap-1.5 text-sm text-ink-muted" aria-label="Ruta">
-                {{ $breadcrumbs }}
-            </nav>
-        @endisset
+        @if (isset($breadcrumbs) || (! empty($nav) && empty($hideTerm)))
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <nav class="flex flex-wrap items-center gap-1.5 text-sm text-ink-muted" aria-label="Ruta">
+                    {{ $breadcrumbs ?? '' }}
+                </nav>
+                @if (! empty($nav) && empty($hideTerm))
+                    <x-term-switch :group="$navGroup" class="ml-auto" />
+                @endif
+            </div>
+        @endif
 
         @if (session('status'))
             <div class="mb-4 flex items-start gap-2 rounded-xl border border-done/30 bg-done-soft px-4 py-3 text-sm font-medium text-done" role="status">
@@ -106,7 +112,7 @@
     @if (! empty($nav))
         {{-- Pestañas inferiores en teléfono/iPad: el pulgar llega sin estirarse. --}}
         <nav class="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Principal">
-            <div class="mx-auto grid max-w-xl grid-cols-4">
+            <div class="mx-auto grid max-w-xl grid-cols-5">
                 @foreach ($nav as $item)
                     <a href="{{ $item['route'] }}" @class(['flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-semibold',
                         'text-primary' => $item['active'], 'text-ink-muted' => ! $item['active']])

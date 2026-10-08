@@ -1,20 +1,25 @@
 /**
  * Teclado de calificaciones tipo punto de venta.
  *
- * Cualquier botón [data-score-cell] dentro de un contenedor [data-grades-url] abre el teclado.
- * Un tap en 0–10 guarda y salta al siguiente alumno; los decimales se escriben a mano.
- * El guardado es optimista: la pantalla avanza sin esperar a la red y, si algo falla,
- * la celda queda en rojo y se reintenta al volver la conexión.
+ * Cualquier botón [data-score-cell] dentro de un contenedor [data-score-url] abre el teclado.
+ * Un tap guarda y salta al siguiente alumno. El guardado es optimista: la pantalla avanza sin
+ * esperar a la red y, si algo falla, la celda queda en rojo y se reintenta al volver la conexión.
  *
- * Avance: si el contenedor tiene data-advance="column" se baja por el mismo aspecto
- * (matriz); si no, se sigue el orden del documento (captura, ficha del alumno).
+ * Modo según la celda (data-mode): "score" = 0–10 (decimales a mano); "levels" = criterio de
+ * proyecto por nivel de logro, con el descriptor de la rúbrica (data-descriptors del contenedor).
+ *
+ * Avance: con data-advance="column" en el contenedor se baja por la misma columna (matriz);
+ * si no, se sigue el orden del documento (captura, ficha del alumno).
+ *
+ * El servidor responde qué repintar (TermBook::paint): textos, niveles, barras y filas completas,
+ * por clave → elementos con data-paint="clave" / data-bar="clave" / data-paint-done="clave".
  */
-import { showToast, fmt } from './ui';
+import { showToast, fmt, levelOf, LEVEL_LABELS } from './ui';
 
 const pad = document.getElementById('keypad');
 const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
-const failed = new Map(); // cell → value pendiente de reintentar
 const desktop = matchMedia('(min-width: 768px)');
+const failed = new Map(); // celda → valor pendiente de reintentar
 let current = null;
 let digitBuffer = '';
 let digitTimer;
@@ -79,7 +84,7 @@ export function initKeypad() {
         } else if (e.key === 'Delete' || e.key === 'Backspace') {
             e.preventDefault();
             commit('');
-        } else if (e.key === '.' || e.key === ',') {
+        } else if ((e.key === '.' || e.key === ',') && current.dataset.mode === 'score') {
             e.preventDefault();
             toggleDecimal(true);
         }
@@ -91,22 +96,24 @@ export function initKeypad() {
     });
 }
 
-/** Teclado físico: "1" espera un instante por si sigue "0" (= 10); cualquier otro dígito guarda al momento. */
+/** Teclado físico: "1" espera un instante por si sigue "0" (= 10). En modo niveles solo 6–10. */
 function typeDigit(d) {
+    const levels = current.dataset.mode === 'levels';
     if (digitBuffer === '1') {
         clearTimeout(digitTimer);
         digitBuffer = '';
         if (d === '0') return commit('10');
-        commit('1');
+        if (!levels) commit('1');
     }
     if (d === '1') {
         digitBuffer = '1';
         digitTimer = setTimeout(() => {
             digitBuffer = '';
-            commit('1');
+            if (!levels) commit('1');
         }, 450);
         return;
     }
+    if (levels && !['6', '7', '8', '9'].includes(d)) return;
     commit(d);
 }
 
@@ -115,11 +122,17 @@ export function open(cell) {
     current = cell;
     cell.classList.add('is-active');
 
+    const levels = cell.dataset.mode === 'levels';
     pad.querySelector('[data-pad-student]').textContent = cell.dataset.studentName;
-    pad.querySelector('[data-pad-criterion]').textContent = cell.dataset.criterionName;
-    pad.querySelector('[data-pad-current]').textContent = cell.dataset.value === '' ? 'Sin calificar' : `Actual: ${fmt(cell.dataset.value)}`;
+    pad.querySelector('[data-pad-unit]').textContent = cell.dataset.unitName;
+    pad.querySelector('[data-pad-current]').textContent =
+        cell.dataset.value === '' ? 'Sin calificar' : `Actual: ${fmt(cell.dataset.value)}${levels ? ' · ' + LEVEL_LABELS[levelOf(cell.dataset.value)] : ''}`;
     pad.querySelectorAll('[data-key]').forEach((k) => k.setAttribute('aria-pressed', String(k.dataset.key === cell.dataset.value)));
-    toggleDecimal(false);
+
+    pad.querySelector('[data-pad-levels]').hidden = !levels;
+    pad.querySelector('[data-pad-grid]').hidden = levels;
+    pad.querySelector('[data-pad-decimal-form]').hidden = true;
+    if (levels) fillDescriptors(cell);
 
     if (pad.hidden) {
         pad.hidden = false;
@@ -132,6 +145,29 @@ export function open(cell) {
     const smooth = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
     cell.scrollIntoView({ block: desktop.matches ? 'nearest' : 'center', inline: 'nearest', behavior: smooth });
     place();
+}
+
+/** Descriptores de la rúbrica del criterio debajo de cada nivel. */
+function fillDescriptors(cell) {
+    const container = cell.closest('[data-score-url]');
+    let map = {};
+    try {
+        map = JSON.parse(container.dataset.descriptors || '{}');
+    } catch (e) {
+        map = {};
+    }
+    const d = map[cell.dataset.id] || {};
+    pad.querySelectorAll('[data-pad-descriptor]').forEach((el) => {
+        el.textContent = d[el.dataset.padDescriptor] || '';
+        el.hidden = !el.textContent;
+    });
+}
+
+export function close() {
+    current?.classList.remove('is-active');
+    current = null;
+    pad.hidden = true;
+    document.body.classList.remove('keypad-open');
 }
 
 /** Pop-up junto a la casilla: a su derecha si cabe, si no a su izquierda, si no debajo/encima. */
@@ -168,13 +204,6 @@ function place() {
     pad.style.setProperty('--pad-origin', origin);
 }
 
-export function close() {
-    current?.classList.remove('is-active');
-    current = null;
-    pad.hidden = true;
-    document.body.classList.remove('keypad-open');
-}
-
 function toggleDecimal(show) {
     const form = pad.querySelector('[data-pad-decimal-form]');
     form.hidden = !show;
@@ -185,13 +214,14 @@ function toggleDecimal(show) {
         input.focus();
         input.select();
     }
+    place();
 }
 
 function sequence(cell) {
-    const container = cell.closest('[data-grades-url]');
+    const container = cell.closest('[data-score-url]');
     let cells = [...container.querySelectorAll('[data-score-cell]')];
     if (container.dataset.advance === 'column') {
-        cells = cells.filter((c) => c.dataset.criterion === cell.dataset.criterion);
+        cells = cells.filter((c) => c.dataset.kind === cell.dataset.kind && c.dataset.id === cell.dataset.id);
     }
     return cells.filter((c) => c.offsetParent !== null);
 }
@@ -213,21 +243,29 @@ function commit(value) {
 
 function setCell(cell, value, state = null) {
     cell.dataset.value = value === null ? '' : String(value);
-    cell.textContent = cell.dataset.value === '' ? '—' : fmt(cell.dataset.value);
-    cell.toggleAttribute('data-empty', cell.dataset.value === '');
+    const empty = cell.dataset.value === '';
+    cell.textContent = empty ? '—' : fmt(cell.dataset.value);
+    cell.toggleAttribute('data-empty', empty);
+    empty ? cell.removeAttribute('data-level') : (cell.dataset.level = levelOf(cell.dataset.value));
     cell.classList.remove('is-saving', 'is-error');
     if (state) cell.classList.add(state);
     const row = cell.closest('[data-search-item]');
-    if (row && row.dataset.doneBy === 'cell') row.dataset.done = cell.dataset.value === '' ? '0' : '1';
+    if (row && row.dataset.doneBy === 'cell') row.dataset.done = empty ? '0' : '1';
 }
 
 async function save(cell, value) {
-    const container = cell.closest('[data-grades-url]');
+    const container = cell.closest('[data-score-url]');
     try {
-        const res = await fetch(container.dataset.gradesUrl, {
+        const res = await fetch(container.dataset.scoreUrl, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-            body: JSON.stringify({ student_id: cell.dataset.student, criterion_id: cell.dataset.criterion, score: value }),
+            body: JSON.stringify({
+                kind: cell.dataset.kind,
+                id: cell.dataset.id,
+                term: cell.dataset.term,
+                student_id: cell.dataset.student,
+                score: value,
+            }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.status === 419 || res.status === 401) throw new Error('Tu sesión expiró. Recarga la página.');
@@ -235,7 +273,7 @@ async function save(cell, value) {
 
         failed.delete(cell);
         setCell(cell, data.score);
-        paint(cell, data);
+        paint(data.paint);
     } catch (e) {
         failed.set(cell, value);
         cell.classList.remove('is-saving');
@@ -244,34 +282,15 @@ async function save(cell, value) {
     }
 }
 
-/** Refresca totales que dependen de la celda. Los selectores llevan proyecto:alumno. */
-function paint(cell, data) {
-    const key = `${data.project.id}:${cell.dataset.student}`;
-    const set = (sel, fn) => document.querySelectorAll(sel).forEach(fn);
+function paint({ text = {}, level = {}, bar = {}, done = {} } = {}) {
+    const each = (attr, key, fn) => document.querySelectorAll(`[${attr}="${CSS.escape(key)}"]`).forEach(fn);
 
-    set(`[data-percent="${key}"]`, (el) => (el.textContent = `${fmt(data.student.percent)}%`));
-    set(`[data-final="${key}"]`, (el) => {
-        el.textContent = fmt(data.student.final);
-        el.classList.toggle('opacity-40', !data.student.complete);
-    });
-    set(`[data-status="${key}"]`, (el) => {
-        el.textContent = data.student.complete ? 'Completo' : `Faltan ${data.student.missing}`;
-        el.classList.toggle('chip-done', data.student.complete);
-        el.classList.toggle('chip-pending', !data.student.complete);
-    });
-    set(`[data-row-done="${key}"]`, (el) => (el.dataset.done = data.student.complete ? '1' : '0'));
-
-    const c = cell.dataset.criterion;
-    const cDone = data.criterion_total - data.criterion_missing;
-    set(`[data-criterion-missing="${c}"]`, (el) => (el.textContent = data.criterion_missing === 0 ? 'Completo' : `${data.criterion_missing} sin calificar`));
-    set(`[data-criterion-count="${c}"]`, (el) => (el.textContent = `${cDone}/${data.criterion_total}`));
-    set(`[data-criterion-bar="${c}"]`, (el) => (el.style.width = `${data.criterion_total ? (cDone * 100) / data.criterion_total : 0}%`));
-
-    const p = data.project.id;
-    set(`[data-project-graded="${p}"]`, (el) => (el.textContent = data.project.graded));
-    set(`[data-project-missing="${p}"]`, (el) => (el.textContent = data.project.missing));
-    set(`[data-project-progress="${p}"]`, (el) => (el.textContent = `${data.project.progress}%`));
-    set(`[data-project-bar="${p}"]`, (el) => (el.style.width = `${data.project.progress}%`));
+    Object.entries(text).forEach(([k, v]) => each('data-paint', k, (el) => (el.textContent = v)));
+    Object.entries(level).forEach(([k, v]) =>
+        each('data-paint', k, (el) => (v ? (el.dataset.level = v) : el.removeAttribute('data-level'))),
+    );
+    Object.entries(bar).forEach(([k, v]) => each('data-bar', k, (el) => (el.style.width = `${v}%`)));
+    Object.entries(done).forEach(([k, v]) => each('data-paint-done', k, (el) => (el.dataset.done = v ? '1' : '0')));
 
     document.dispatchEvent(new CustomEvent('grades:changed'));
 }

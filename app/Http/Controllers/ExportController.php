@@ -3,31 +3,28 @@
 namespace App\Http\Controllers;
 
 use App\Models\Group;
-use App\Models\Project;
+use App\Support\Campos;
 use App\Support\ExcelExporter;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
+/** Excel de un trimestre (?trimestre=N; por omisión, el trimestre activo del grupo). */
 class ExportController extends Controller
 {
-    public function group(Group $group): StreamedResponse
+    public function __invoke(Request $request, Group $group): StreamedResponse
     {
-        return $this->download(ExcelExporter::forGroup($group), 'calificaciones '.$group->label().' '.$group->shift);
-    }
+        $term = (int) $request->query('trimestre', $group->term());
+        abort_unless(in_array($term, Campos::TERMS, true), 404);
 
-    public function project(Group $group, Project $project): StreamedResponse
-    {
-        return $this->download(ExcelExporter::forProject($project), $group->label().' '.$project->name);
-    }
+        $book = ExcelExporter::forTerm($group, $term);
+        $filename = Str::slug("calificaciones {$group->label()} {$group->shift} trimestre {$term}").'-'.now()->format('Y-m-d').'.xlsx';
 
-    private function download(Spreadsheet $book, string $name): StreamedResponse
-    {
-        $filename = Str::slug($name).'-'.now()->format('Y-m-d').'.xlsx';
-
-        return response()->streamDownload(function () use ($book) {
-            (new Xlsx($book))->save('php://output');
-        }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+        return response()->streamDownload(
+            fn () => (new Xlsx($book))->save('php://output'),
+            $filename,
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        );
     }
 }

@@ -2,11 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Grade;
 use App\Models\Group;
 use App\Models\Student;
-use App\Support\Gradebook;
-use App\Support\GroupOverview;
+use App\Support\TermBook;
 use App\Support\StudentListImporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,30 +18,20 @@ class StudentController extends Controller
 {
     public function index(Group $group): View
     {
-        $overview = GroupOverview::for($group);
+        $book = TermBook::for($group);
         $students = $group->students()->get();
-        $missing = $overview->students->mapWithKeys(fn ($s) => [$s->id => $overview->missingForStudent($s)]);
-        $averages = $overview->students->mapWithKeys(fn ($s) => [$s->id => $overview->averageForStudent($s)]);
+        $missing = $book->students->mapWithKeys(fn ($s) => [$s->id => $book->missingFor($s)]);
+        $averages = $book->students->mapWithKeys(fn ($s) => [$s->id => $book->generalAverage($s)]);
 
         return view('students.index', compact('group', 'students', 'missing', 'averages'));
     }
 
-    /** Ficha del alumno: todas sus calificaciones por proyecto, capturables con el teclado. */
+    /** Ficha del alumno en el trimestre: cada campo con su desglose, capturable con el teclado. */
     public function show(Group $group, Student $student): View
     {
-        $projects = $group->projects()->with('criteria')->get();
-        $scores = Grade::where('student_id', $student->id)
-            ->whereIn('criterion_id', $projects->flatMap->criteria->pluck('id'))
-            ->pluck('score', 'criterion_id')
-            ->all();
+        $book = TermBook::for($group);
 
-        $rows = $projects->map(fn ($p) => [
-            'project' => $p,
-            'percent' => Gradebook::percentFrom($p->criteria, $scores),
-            'missing' => $p->criteria->filter(fn ($c) => ! isset($scores[$c->id]))->count(),
-        ]);
-
-        return view('students.show', compact('group', 'student', 'rows', 'scores'));
+        return view('students.show', compact('group', 'student', 'book'));
     }
 
     /** Alta pegando texto (respaldo del Excel). */
@@ -95,7 +83,7 @@ class StudentController extends Controller
 
     public function destroy(Group $group, Student $student): RedirectResponse
     {
-        if ($student->grades()->exists()) {
+        if ($student->hasScores()) {
             return back()->withErrors(['student' => "{$student->name} ya tiene calificaciones. Dalo de baja en lugar de eliminarlo para no perderlas."]);
         }
 

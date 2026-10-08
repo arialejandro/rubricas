@@ -2,18 +2,24 @@
 
 namespace App\Models;
 
+use App\Support\Campos;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
-#[Fillable(['name', 'description', 'due_date'])]
+/**
+ * Proyecto de un trimestre. `campo` es el campo donde se planteó; cada producto puede
+ * evaluarse en otro campo (transversalidad) y suma a ESE campo.
+ */
+#[Fillable(['term', 'campo', 'name', 'description', 'pdas', 'due_date'])]
 class Project extends Model
 {
+    public const MAX_PDAS = 4;
+
     protected function casts(): array
     {
-        return ['due_date' => 'date'];
+        return ['due_date' => 'date', 'pdas' => 'array', 'term' => 'integer'];
     }
 
     public function group(): BelongsTo
@@ -21,23 +27,19 @@ class Project extends Model
         return $this->belongsTo(Group::class);
     }
 
-    public function criteria(): HasMany
+    public function products(): HasMany
     {
-        return $this->hasMany(Criterion::class)->orderBy('position')->orderBy('id');
+        return $this->hasMany(Product::class)->orderBy('position')->orderBy('id');
     }
 
-    public function grades(): HasManyThrough
+    public function campoName(): string
     {
-        return $this->hasManyThrough(Grade::class, Criterion::class);
+        return Campos::name($this->campo);
     }
 
-    public function totalWeight(): float
+    /** Campos en los que suma este proyecto (el principal + los de sus productos). */
+    public function campos(): array
     {
-        return round((float) $this->criteria->sum('weight'), 2);
-    }
-
-    public function weightsAreValid(): bool
-    {
-        return abs($this->totalWeight() - 100) < 0.01;
+        return collect([$this->campo])->merge($this->products->pluck('campo'))->unique()->values()->all();
     }
 }

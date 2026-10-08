@@ -42,41 +42,8 @@ class DatabaseSeeder extends Seeder
         $list = collect(range(1, $count))
             ->map(fn () => fake()->randomElement($surnames).' '.fake()->randomElement($surnames).' '.fake()->randomElement($names))
             ->unique()->sort()->values();
-        $students = $list->map(fn ($n, $i) => $group->students()->create(['name' => $n, 'list_number' => $i + 1]));
+        $list->each(fn ($n, $i) => $group->students()->create(['name' => $n, 'list_number' => $i + 1]));
 
-        $maqueta = $group->projects()->create(['name' => 'Maqueta del sistema solar', 'due_date' => now()->subWeek()]);
-        $maqueta->criteria()->createMany([
-            ['name' => 'Investigación', 'weight' => 20, 'position' => 0],
-            ['name' => 'Creatividad', 'weight' => 30, 'position' => 1],
-            ['name' => 'Exposición', 'weight' => 50, 'position' => 2],
-        ]);
-
-        $ensayo = $group->projects()->create(['name' => 'Ensayo: el ciclo del agua', 'due_date' => now()->addWeek()]);
-        $ensayo->criteria()->createMany([
-            ['name' => 'Ortografía', 'weight' => 40, 'position' => 0],
-            ['name' => 'Contenido', 'weight' => 60, 'position' => 1],
-        ]);
-
-        $group->projects()->create(['name' => 'Periódico mural', 'due_date' => now()->addWeeks(3)])
-            ->criteria()->createMany([
-                ['name' => 'Diseño', 'weight' => 25, 'position' => 0],
-                ['name' => 'Información', 'weight' => 25, 'position' => 1],
-                ['name' => 'Trabajo en equipo', 'weight' => 25, 'position' => 2],
-                ['name' => 'Limpieza', 'weight' => 25, 'position' => 3],
-            ]);
-
-        if (! $withGrades) {
-            return;
-        }
-
-        // Maqueta: dos aspectos completos y el tercero a medias → hay pendientes que perseguir.
-        foreach ($maqueta->criteria as $ci => $criterion) {
-            foreach ($students as $si => $student) {
-                if ($ci === 2 && $si % 3 === 0) {
-                    continue;
-                }
-                $criterion->grades()->create(['student_id' => $student->id, 'score' => fake()->randomElement([6, 7, 7.5, 8, 8.5, 9, 9.5, 10])]);
-            }
-        }
+        NemDemoSeeder::seedGroup($group, $withGrades);
     }
 }

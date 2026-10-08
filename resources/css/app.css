@@ -55,6 +55,14 @@
     --done-soft: #d5f7ec;
     --danger: #b91c1c;
     --danger-soft: #fee2e2;
+    --lvl-logrado: #15803d;
+    --lvl-logrado-soft: #dcfce7;
+    --lvl-satisfactorio: #4d7c0f;
+    --lvl-satisfactorio-soft: #ecfccb;
+    --lvl-proceso: #b45309;
+    --lvl-proceso-soft: #fef3c7;
+    --lvl-apoyo: #b91c1c;
+    --lvl-apoyo-soft: #fee2e2;
     color-scheme: light;
 }
 
@@ -78,6 +86,14 @@
     --done-soft: #123630;
     --danger: #f87171;
     --danger-soft: #3b1515;
+    --lvl-logrado: #4ade80;
+    --lvl-logrado-soft: #12321f;
+    --lvl-satisfactorio: #a3e635;
+    --lvl-satisfactorio-soft: #26320f;
+    --lvl-proceso: #fbbf24;
+    --lvl-proceso-soft: #3a2a0c;
+    --lvl-apoyo: #f87171;
+    --lvl-apoyo-soft: #3b1515;
     color-scheme: dark;
 }
 
@@ -116,6 +132,29 @@
     .score.is-active { @apply border-primary ring-4 ring-primary-soft; }
     .score.is-saving { @apply opacity-60; }
     .score.is-error { @apply border-danger bg-danger-soft text-danger; }
+
+    /*
+     * Niveles de logro (App\Support\Level): verde = mejor → rojo = peor.
+     * Cualquier elemento con data-level se pinta solo; keypad.js actualiza el atributo.
+     * "provisional" = promedio con pendientes (se atenúa); done/pending = chips de estado.
+     */
+    [data-level='logrado'] { --lvl: var(--lvl-logrado); --lvl-soft: var(--lvl-logrado-soft); }
+    [data-level='satisfactorio'] { --lvl: var(--lvl-satisfactorio); --lvl-soft: var(--lvl-satisfactorio-soft); }
+    [data-level='proceso'] { --lvl: var(--lvl-proceso); --lvl-soft: var(--lvl-proceso-soft); }
+    [data-level='apoyo'] { --lvl: var(--lvl-apoyo); --lvl-soft: var(--lvl-apoyo-soft); }
+    [data-level='done'] { --lvl: var(--done); --lvl-soft: var(--done-soft); }
+    [data-level='pending'] { --lvl: var(--pending); --lvl-soft: var(--pending-soft); }
+    .lvl-text[data-level]:not([data-level='provisional']) { color: var(--lvl); }
+    .lvl-text[data-level='provisional'] { opacity: .45; }
+    .lvl-chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap bg-surface-2 text-ink-muted; }
+    .lvl-chip[data-level]:not([data-level='provisional']) { background: var(--lvl-soft); color: var(--lvl); }
+    .score[data-level]:not([data-empty]) { border-color: color-mix(in srgb, var(--lvl) 55%, transparent); background: var(--lvl-soft); color: var(--lvl); }
+
+    /* Chip de campo formativo: color de identidad del campo en --c (App\Support\Campos). */
+    .campo-chip { @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap;
+        color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); }
+    .dark .campo-chip { color: color-mix(in srgb, var(--c) 45%, white); background: color-mix(in srgb, var(--c) 28%, transparent); }
+    .campo-bar { background: var(--c); }
 
     .key { @apply tabular-nums grid min-h-14 place-items-center rounded-2xl border border-line bg-surface text-2xl font-bold text-ink transition duration-100 select-none hover:bg-surface-2 active:scale-95 active:bg-primary-soft; }
 }

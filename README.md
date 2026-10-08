@@ -1,31 +1,48 @@
 # Rúbrica
 
-App para que maestras registren proyectos, los evalúen con rúbricas ponderadas y descarguen todo en Excel.
+Evaluación trimestral de primaria (NEM) para maestras: campos formativos, proyectos transversales
+con instrumentos y criterios por nivel de logro, y exportación a Excel.
 
-## Cómo funciona
+## Modelo de evaluación
 
-- **Maestra → Grupo (máx. 2: matutino y vespertino) → Alumnos / Proyectos → Aspectos → Calificaciones.**
-  Cada maestra solo ve sus grupos. El selector de turno de la barra superior cambia de grupo.
-- Cada grupo guarda su **centro de trabajo**: escuela, CCT, zona escolar, grado, grupo y ciclo.
-- **Lista de alumnos desde Excel**: columnas `N.L.` y `Nombre` (o apellidos en columnas separadas). Hay plantilla.
-  Volver a subirla no duplica: solo actualiza números de lista. Nombres en MAYÚSCULAS se pasan a nombre propio.
-- **Captura tipo punto de venta**: proyectos y aspectos en tarjetas; al tocar una calificación se abre un teclado
-  0–10 que guarda con un tap y salta al siguiente alumno. Decimales con la tecla `0,0`.
-- **Buscador** por apellido, nombre o número de lista (sin importar acentos). Enter abre el primer resultado.
+```
+Grupo (turno) → Trimestre 1–3 → 4 campos formativos
+   Lenguajes · Saberes y Pensamiento Científico · Ética, Naturaleza y Sociedades · De lo Humano y lo Comunitario
+   └─ aspectos del campo (texto libre, con %; 3 a 6, suman 100%) — cambian cada trimestre
+        · tipo "De los proyectos" → promedio de los productos evaluados en ese campo
+        · tipo "Captura directa"  → 0–10 por alumno (Examen, Tareas…)
+   └─ materias adicionales (Artes, Inglés en Lenguajes; Educación Física en De lo Humano)
+Proyecto (trimestre, campo donde se plantea, 1–4 PDA)
+   └─ productos: cada uno se evalúa en SU campo (transversalidad) con un instrumento
+        └─ criterios a observar con el descriptor de cada nivel (de la rúbrica)
+```
+
+**Niveles de logro** (un criterio se califica eligiendo nivel): Logrado **10** · Satisfactorio **9** ·
+En proceso **8 o 7** · Requiere apoyo **6**. Colores de verde (mejor) a rojo (peor). Un promedio se
+clasifica al nivel más cercano (≥9.5 Logrado, ≥8.5 Satisfactorio, ≥6.5 En proceso).
+
+**Cálculo de un campo** (`App\Support\TermBook`):
+1. Producto = promedio de sus criterios.
+2. Aspecto "proyectos" = promedio de los productos de ese campo (de cualquier proyecto).
+3. Base = Σ aspecto × %. Con pendientes se reparte entre lo que ya hay y se marca *provisional*.
+4. Final = promedio en partes iguales de la base y las materias adicionales del campo.
+
+**Vacío ≠ 0**: una celda vacía es *pendiente*. Pendientes por campo, aspecto, criterio, alumno y grupo.
+
+## Uso
+
+- Hasta 2 grupos por maestra (matutino y vespertino); selector de turno y de trimestre siempre a la mano.
+- Centro de trabajo por grupo: escuela, CCT, zona escolar, grado, grupo, ciclo.
+- Lista de alumnos desde Excel (`N.L.` + `Nombre`, o apellidos separados). Hay plantilla; no duplica.
+- Captura tipo punto de venta: tarjetas → lista con buscador → teclado (0–10 o niveles con el descriptor
+  de la rúbrica). Un tap guarda y salta al siguiente alumno.
 - Modo claro / oscuro.
-- Cada proyecto tiene uno o varios **aspectos** con un **peso %** (deben sumar 100%).
-- Cada aspecto se califica de **0 a 10**. Aporta `calificación ÷ 10 × peso`. Ej.: un 8 en un aspecto de 20% = 16%.
-  La suma es el % final; ÷ 10 = calificación final (0–10).
-- **Vacío ≠ 0**: una celda vacía es *pendiente*; un 0 es una calificación.
-- Controles contra olvidos: contador de pendientes por grupo, proyecto, aspecto y alumno; filtro "solo pendientes";
-  nota final en gris mientras esté incompleta; Excel con celdas amarillas y hoja **Pendientes**.
-- **Modo captura**: un aspecto a la vez, lista de alumnos con teclado numérico; Enter salta al siguiente. Se guarda solo.
-- Alumnos dados de **baja** conservan sus calificaciones y dejan de contar como pendientes.
 
-## Excel
+## Excel (por trimestre)
 
-- Por grupo: hoja *Resumen* (final de cada proyecto + promedio), hoja *Pendientes* y una hoja por proyecto.
-- Las notas finales son **fórmulas**: si se corrige una calificación dentro de Excel, el total se recalcula.
+*Resumen* (final por campo + promedio y nivel) · una hoja por **campo** (aspectos, base, materias, final y
+la matriz de niveles: el valor cae en la columna de su nivel) · una hoja por **proyecto** (encabezado con
+campo y PDA; producto → criterio → 4 columnas de nivel) · *Instrumentos* (descriptores) · *Pendientes*.
 
 ## Desarrollo local
 
@@ -34,7 +51,7 @@ Requiere PHP 8.3+, Composer, MySQL 5.7+/MariaDB y Node (solo para recompilar est
 ```bash
 composer install
 cp .env.example .env && php artisan key:generate
-php artisan migrate --seed   # crea la maestra demo: demo@rubrica.test / demo1234
+php artisan migrate --seed   # crea la maestra demo con datos NEM: demo@rubrica.test / demo1234
 php -S 127.0.0.1:8130 -t public server.php
 ```
 

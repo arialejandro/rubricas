@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['name', 'list_number', 'active'])]
 class Student extends Model
@@ -20,8 +19,11 @@ class Student extends Model
         return $this->belongsTo(Group::class);
     }
 
-    public function grades(): HasMany
+    /** ¿Tiene alguna calificación capturada? (entonces no se borra: se da de baja). */
+    public function hasScores(): bool
     {
-        return $this->hasMany(Grade::class);
+        return CriterionScore::where('student_id', $this->id)->exists()
+            || AspectScore::where('student_id', $this->id)->exists()
+            || SubjectScore::where('student_id', $this->id)->exists();
     }
 }

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Group;
-use App\Support\GroupOverview;
+use App\Support\TermBook;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -50,9 +50,9 @@ class GroupController extends Controller
 
     public function show(Group $group): View
     {
-        $overview = GroupOverview::for($group);
+        $book = TermBook::for($group);
 
-        return view('groups.show', compact('group', 'overview'));
+        return view('groups.show', compact('group', 'book'));
     }
 
     public function edit(Request $request, Group $group): View
