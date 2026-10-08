@@ -1,7 +1,7 @@
 <x-layouts.app title="Crear cuenta">
     <div class="mx-auto mt-6 max-w-sm sm:mt-16">
         <div class="mb-6 text-center">
-            <div class="mx-auto mb-3 grid size-16 place-items-center rounded-2xl bg-primary text-on-primary"><x-icon name="clipboard" class="size-8" /></div>
+            <img src="{{ asset('images/logo.png') }}" alt="" class="mx-auto mb-3 size-20 rounded-3xl shadow-lg shadow-primary/20" width="80" height="80">
             <h1 class="text-2xl font-bold">Crear cuenta</h1>
         </div>
 

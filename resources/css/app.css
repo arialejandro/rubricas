@@ -23,6 +23,9 @@
     --color-primary-strong: var(--primary-strong);
     --color-primary-soft: var(--primary-soft);
     --color-on-primary: var(--on-primary);
+    --color-mint: var(--mint);
+    --color-mint-strong: var(--mint-strong);
+    --color-mint-soft: var(--mint-soft);
     --color-pending: var(--pending);
     --color-pending-soft: var(--pending-soft);
     --color-done: var(--done);
@@ -31,41 +34,48 @@
     --color-danger-soft: var(--danger-soft);
 }
 
+/* Morado (dominante) + menta (acento: completo, avance, "10"). Naranja solo para pendientes. */
 :root {
-    --canvas: #f3f6f6;
+    --canvas: #f6f4fb;
     --surface: #ffffff;
-    --surface-2: #eef3f3;
-    --line: #d9e3e2;
-    --ink: #10201f;
-    --ink-muted: #556866;
-    --primary: #0f766e;
-    --primary-strong: #115e59;
-    --primary-soft: #d6f1ed;
+    --surface-2: #f1edf9;
+    --line: #e2dcef;
+    --ink: #1e1533;
+    --ink-muted: #625a78;
+    --primary: #6d28d9;
+    --primary-strong: #5b21b6;
+    --primary-soft: #ede7fd;
     --on-primary: #ffffff;
+    --mint: #3ddbb4;
+    --mint-strong: #0b7a63;
+    --mint-soft: #d5f7ec;
     --pending: #c2410c;
     --pending-soft: #ffedd5;
-    --done: #15803d;
-    --done-soft: #dcfce7;
+    --done: #0b7a63;
+    --done-soft: #d5f7ec;
     --danger: #b91c1c;
     --danger-soft: #fee2e2;
     color-scheme: light;
 }
 
 .dark {
-    --canvas: #0b1213;
-    --surface: #121c1d;
-    --surface-2: #1a2728;
-    --line: #2a3a3b;
-    --ink: #e6efee;
-    --ink-muted: #9db0ae;
-    --primary: #2dd4bf;
-    --primary-strong: #5eead4;
-    --primary-soft: #123a37;
-    --on-primary: #04201d;
+    --canvas: #110d1b;
+    --surface: #1a1427;
+    --surface-2: #241c35;
+    --line: #352b4b;
+    --ink: #efebf8;
+    --ink-muted: #aaa1c0;
+    --primary: #a78bfa;
+    --primary-strong: #c4b5fd;
+    --primary-soft: #2e2250;
+    --on-primary: #1a0f33;
+    --mint: #5eead4;
+    --mint-strong: #6ff0d0;
+    --mint-soft: #123630;
     --pending: #fb923c;
     --pending-soft: #3a2212;
-    --done: #4ade80;
-    --done-soft: #12301f;
+    --done: #6ff0d0;
+    --done-soft: #123630;
     --danger: #f87171;
     --danger-soft: #3b1515;
     color-scheme: dark;
@@ -114,10 +124,52 @@
 @media (max-width: 767px) {
     body.keypad-open #main { padding-bottom: 30rem; }
 }
-/* En iPad/escritorio el teclado flota a la derecha: el contenido se recorre para que no lo tape. */
+
+/* Teclado: entra como pop-up (escritorio/iPad) o como hoja desde abajo (teléfono). */
+@keyframes pad-pop { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+@keyframes pad-sheet { from { transform: translateY(100%); } to { transform: translateY(0); } }
+#keypad.is-entering > div { animation: pad-sheet .22s cubic-bezier(.2, .8, .2, 1); }
 @media (min-width: 768px) {
-    body.keypad-open #main { padding-right: calc(380px + 3rem); }
+    #keypad { transition: top .18s cubic-bezier(.2, .8, .2, 1), left .18s cubic-bezier(.2, .8, .2, 1); }
+    #keypad.is-entering > div { animation: pad-pop .16s ease-out; transform-origin: var(--pad-origin, left center); }
 }
+
+/* ---------- Selector de turno (components/shift-switch) ---------- */
+.shift-seg {
+    position: relative; isolation: isolate; overflow: hidden;
+    display: flex; align-items: center; gap: .4rem;
+    min-height: 2.75rem; padding: 0 .55rem; border-radius: .8rem;
+    font-size: .875rem; font-weight: 600; color: var(--ink-muted);
+    transition: color .4s ease;
+}
+@media (min-width: 640px) { .shift-seg { padding: 0 .85rem 0 .55rem; } }
+.shift-sky {
+    position: absolute; inset: 0; z-index: -1; opacity: 0;
+    transition: opacity .45s ease;
+}
+.shift-matutino .shift-sky { background: linear-gradient(180deg, #7cc8fb 0%, #b9e3fd 55%, #fff1c2 100%); }
+.shift-vespertino .shift-sky { background: linear-gradient(180deg, #8b5cf6 0%, #f472b6 45%, #fb923c 85%, #fdba74 100%); }
+.shift-seg.is-active .shift-sky { opacity: 1; }
+.shift-seg.is-active.shift-matutino { color: #0c3a5e; }
+.shift-seg.is-active.shift-vespertino { color: #fff; text-shadow: 0 1px 2px rgb(120 30 10 / .35); }
+.shift-seg:not(.is-active):hover { color: var(--ink); }
+
+.shift-scene { position: relative; width: 1.75rem; height: 1.75rem; flex-shrink: 0; overflow: visible; }
+.shift-sun { fill: currentColor; transition: fill .4s ease; }
+.shift-rays rect { fill: currentColor; }
+.shift-horizon { stroke: currentColor; }
+.shift-matutino.is-active .shift-sun { fill: #fbbf24; }
+.shift-matutino.is-active .shift-rays rect { fill: #f59e0b; }
+.shift-vespertino.is-active .shift-sun { fill: #fde68a; }
+.shift-vespertino.is-active .shift-horizon { stroke: #fff; }
+
+/* Al cambiar de turno: el sol sale (matutino) o se oculta a medias (vespertino). */
+@keyframes sun-rise { from { transform: translateY(13px); } to { transform: translateY(0); } }
+@keyframes sun-set { from { transform: translateY(-7px); } to { transform: translateY(0); } }
+@keyframes rays-in { from { opacity: 0; transform: rotate(-40deg) scale(.6); } to { opacity: 1; transform: none; } }
+.shift-seg.is-switching.shift-matutino .shift-sun { animation: sun-rise .7s cubic-bezier(.2, .8, .2, 1) both; }
+.shift-seg.is-switching.shift-matutino .shift-rays { transform-origin: 16px 14px; animation: rays-in .7s .25s cubic-bezier(.2, .8, .2, 1) both; }
+.shift-seg.is-switching.shift-vespertino .shift-sun { animation: sun-set .8s cubic-bezier(.4, 0, .2, 1) both; }
 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; }

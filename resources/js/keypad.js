@@ -14,6 +14,7 @@ import { showToast, fmt } from './ui';
 const pad = document.getElementById('keypad');
 const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
 const failed = new Map(); // cell → value pendiente de reintentar
+const desktop = matchMedia('(min-width: 768px)');
 let current = null;
 let digitBuffer = '';
 let digitTimer;
@@ -23,8 +24,19 @@ export function initKeypad() {
 
     document.addEventListener('click', (e) => {
         const cell = e.target.closest('[data-score-cell]');
-        if (cell) open(cell);
+        if (cell) return open(cell);
+        // Tocar fuera del teclado lo cierra (como cualquier pop-up).
+        if (!pad.hidden && !pad.contains(e.target)) close();
     });
+
+    // El pop-up sigue a su casilla al hacer scroll (página o tabla) o al girar el iPad.
+    let frame;
+    const follow = () => {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(place);
+    };
+    window.addEventListener('scroll', follow, { capture: true, passive: true });
+    window.addEventListener('resize', follow);
 
     pad.querySelectorAll('[data-key]').forEach((key) => key.addEventListener('click', () => commit(key.dataset.key)));
     pad.querySelector('[data-pad-clear]').addEventListener('click', () => commit(''));
@@ -109,9 +121,51 @@ export function open(cell) {
     pad.querySelectorAll('[data-key]').forEach((k) => k.setAttribute('aria-pressed', String(k.dataset.key === cell.dataset.value)));
     toggleDecimal(false);
 
-    pad.hidden = false;
+    if (pad.hidden) {
+        pad.hidden = false;
+        pad.classList.add('is-entering');
+        pad.firstElementChild.addEventListener('animationend', () => pad.classList.remove('is-entering'), { once: true });
+    }
     document.body.classList.add('keypad-open');
-    cell.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+
+    // En escritorio solo se desplaza si la casilla no se ve; en teléfono se centra arriba de la hoja.
+    const smooth = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    cell.scrollIntoView({ block: desktop.matches ? 'nearest' : 'center', inline: 'nearest', behavior: smooth });
+    place();
+}
+
+/** Pop-up junto a la casilla: a su derecha si cabe, si no a su izquierda, si no debajo/encima. */
+function place() {
+    if (!current || pad.hidden) return;
+    if (!desktop.matches) {
+        pad.style.top = pad.style.left = '';
+        return;
+    }
+
+    const r = current.getBoundingClientRect();
+    const w = pad.offsetWidth;
+    const h = pad.offsetHeight;
+    const gap = 12;
+    const margin = 12;
+    const minTop = (document.querySelector('header')?.getBoundingClientRect().bottom ?? 0) + margin;
+    const clampTop = (t) => Math.min(Math.max(t, minTop), innerHeight - h - margin);
+    let left;
+    let top;
+    let origin;
+
+    if (r.right + gap + w <= innerWidth - margin) {
+        [left, top, origin] = [r.right + gap, clampTop(r.top + r.height / 2 - h / 2), 'left center'];
+    } else if (r.left - gap - w >= margin) {
+        [left, top, origin] = [r.left - gap - w, clampTop(r.top + r.height / 2 - h / 2), 'right center'];
+    } else {
+        left = Math.min(Math.max(r.left + r.width / 2 - w / 2, margin), innerWidth - w - margin);
+        const below = r.bottom + gap + h <= innerHeight - margin;
+        [top, origin] = below ? [r.bottom + gap, 'top center'] : [clampTop(r.top - gap - h), 'bottom center'];
+    }
+
+    pad.style.left = `${Math.round(left)}px`;
+    pad.style.top = `${Math.round(top)}px`;
+    pad.style.setProperty('--pad-origin', origin);
 }
 
 export function close() {

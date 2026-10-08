@@ -1,10 +1,11 @@
 {{--
-    Teclado de calificaciones (ver resources/js/keypad.js). No es modal: en iPad/escritorio flota
-    a la derecha y la lista sigue visible; en teléfono es una hoja inferior.
+    Teclado de calificaciones (ver resources/js/keypad.js). No es modal ni mueve la página:
+    en iPad/escritorio aparece como pop-up junto a la casilla tocada y la sigue al avanzar;
+    en teléfono es una hoja inferior.
 --}}
-<div id="keypad" hidden class="fixed inset-x-0 bottom-0 z-40 md:inset-x-auto md:right-6 md:bottom-6 md:w-[380px]"
+<div id="keypad" hidden class="fixed inset-x-0 bottom-0 z-40 md:right-auto md:bottom-auto md:w-[320px]"
      role="dialog" aria-labelledby="keypad-student" aria-describedby="keypad-criterion">
-    <div class="rounded-t-3xl border border-line bg-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgb(0_0_0/0.18)] md:rounded-3xl md:pb-4">
+    <div class="rounded-t-3xl border border-line bg-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgb(30_10_60/0.22)] ring-1 ring-primary/10 md:rounded-3xl md:p-3.5 md:shadow-[0_20px_50px_rgb(30_10_60/0.28)]">
         <div class="mb-3 flex items-start gap-2">
             <button type="button" class="btn btn-ghost btn-icon shrink-0" data-pad-prev aria-label="Alumno anterior"><x-icon name="chevron-left" /></button>
             <div class="min-w-0 flex-1 text-center">
@@ -19,7 +20,7 @@
                 <button type="button" class="key aria-pressed:border-primary aria-pressed:bg-primary-soft" data-key="{{ $n }}">{{ $n }}</button>
             @endforeach
             <button type="button" class="key aria-pressed:border-primary aria-pressed:bg-primary-soft" data-key="0">0</button>
-            <button type="button" class="key bg-primary text-on-primary hover:bg-primary-strong aria-pressed:ring-4 aria-pressed:ring-primary-soft" data-key="10">10</button>
+            <button type="button" class="key border-mint bg-mint text-[#10302a] hover:bg-mint/85 aria-pressed:ring-4 aria-pressed:ring-primary-soft" data-key="10">10</button>
             <button type="button" class="key text-base text-ink-muted" data-pad-decimal aria-label="Escribir con decimales">0,0</button>
             <button type="button" class="key col-span-1 text-base text-danger" data-pad-clear aria-label="Borrar calificación (queda pendiente)">
                 <x-icon name="backspace" class="size-6" />

@@ -4,8 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#0f766e">
+    <meta name="theme-color" content="#6d28d9">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="{{ config('app.name') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
     <title>{{ isset($title) ? $title.' · ' : '' }}{{ config('app.name') }}</title>
     {{-- Aplica el tema guardado antes de pintar para que no "parpadee" en claro. --}}
     <script>
@@ -35,7 +39,7 @@
         <header class="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur pt-[env(safe-area-inset-top)]">
             <div class="mx-auto flex max-w-7xl items-center gap-2 px-4 py-2.5 sm:gap-4">
                 <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 font-bold" aria-label="Inicio">
-                    <span class="grid size-10 place-items-center rounded-xl bg-primary text-on-primary"><x-icon name="clipboard" /></span>
+                    <img src="{{ asset('images/logo.png') }}" alt="" class="size-10 rounded-xl" width="40" height="40">
                     <span class="hidden leading-tight sm:block">
                         {{ config('app.name') }}
                         @if (isset($navGroup) && $navGroup)
@@ -59,21 +63,7 @@
                 <div class="ml-auto flex items-center gap-2">
                     {{-- Selector de turno: cada turno es un grupo; el que no existe ofrece crearlo. --}}
                     @if (isset($navGroups) && $navGroups->isNotEmpty())
-                        <div class="flex rounded-xl border border-line bg-surface-2 p-1" role="group" aria-label="Turno">
-                            @foreach (\App\Models\Group::SHIFTS as $shift => $shiftLabel)
-                                @php($g = $navGroups->get($shift))
-                                @php($on = $navGroup && $navGroup->shift === $shift)
-                                <a href="{{ $g ? route('grupos.show', $g) : route('grupos.create', ['shift' => $shift]) }}"
-                                   @class(['flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-sm font-semibold transition sm:px-3',
-                                       'bg-surface text-ink shadow-sm' => $on, 'text-ink-muted hover:text-ink' => ! $on])
-                                   @if ($on) aria-current="true" @endif
-                                   title="{{ $g ? $shiftLabel.' · '.$g->label() : 'Agregar grupo '.$shiftLabel }}">
-                                    <x-icon :name="$shift === 'matutino' ? 'sun' : 'sunset'" class="size-4" />
-                                    <span class="hidden sm:inline">{{ $shiftLabel }}</span>
-                                    @unless ($g) <x-icon name="plus" class="size-3.5" /> @endunless
-                                </a>
-                            @endforeach
-                        </div>
+                        <x-shift-switch :groups="$navGroups" :current="$navGroup" />
                     @endif
 
                     <button type="button" class="btn btn-ghost btn-icon" data-theme-toggle aria-label="Cambiar modo claro u oscuro">

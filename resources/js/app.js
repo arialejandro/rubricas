@@ -5,10 +5,12 @@ import '@fontsource/fira-sans/700.css';
 
 import { initKeypad } from './keypad';
 import { initSearch } from './search';
+import { initShiftSwitch } from './shift';
 import { normalize, fmt } from './ui';
 
 initKeypad();
 initSearch();
+initShiftSwitch();
 
 // Modo claro/oscuro. El tema inicial lo aplica un <script> en el <head> para no parpadear.
 document.querySelectorAll('[data-theme-toggle]').forEach((btn) => {
