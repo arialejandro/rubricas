@@ -51,3 +51,29 @@ php artisan config:cache && php artisan route:cache && php artisan view:cache
 ```
 
 El document root del dominio debe apuntar a `public/`. Con `RUBRICA_REGISTRATION=false` se cierra el registro público.
+
+### Plesk
+
+1. **PHP 8.3+** en *Sitios web y dominios → Configuración de PHP*.
+2. **Base de datos**: *Bases de datos → Agregar base de datos* (MySQL/MariaDB). Anota nombre, usuario y contraseña.
+3. **Código**: *Laravel Toolkit* (o la extensión *Git*) apuntando a `https://github.com/arialejandro/rubricas.git`,
+   rama `main`. El Toolkit ajusta solo el document root a `public/`; con Git, cámbialo a mano en
+   *Configuración de alojamiento → Raíz del documento* → `httpdocs/public`.
+4. **`.env`**: copia `.env.example` a `.env` y llena `APP_URL` y `DB_*` (`DB_HOST=localhost` en Plesk).
+5. **Comandos** (Laravel Toolkit → Artisan / Composer, o SSH):
+   ```bash
+   composer install --no-dev --optimize-autoloader
+   php artisan key:generate
+   php artisan migrate --force
+   php artisan config:cache && php artisan route:cache && php artisan view:cache
+   ```
+   ⛔ **Nunca `--seed` en el servidor** (crea la cuenta demo con contraseña conocida).
+6. **Cuenta de la maestra** (no hay correo; la contraseña se genera y se muestra una vez):
+   ```bash
+   php artisan maestra:cuenta correo@escuela.mx --nombre="Nombre de la maestra"
+   ```
+   El mismo comando sin `--nombre` le pone **contraseña nueva** a una cuenta existente.
+7. **SSL**: *SSL/TLS → Let's Encrypt*. **Respaldo** diario: *Copias de seguridad → Programar*.
+
+**Actualizar** después de un cambio: *Laravel Toolkit → Deploy* (o `git pull`), luego
+`composer install --no-dev`, `php artisan migrate --force` y los tres `:cache`.

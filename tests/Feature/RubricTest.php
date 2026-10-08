@@ -218,6 +218,27 @@ class RubricTest extends TestCase
         $this->actingAs($this->teacher)->get(route('dashboard'))->assertRedirect(route('grupos.show', $evening));
     }
 
+    public function test_teacher_account_command_creates_and_resets(): void
+    {
+        $this->artisan('maestra:cuenta', ['email' => 'Ana@Escuela.mx', '--nombre' => 'Ana', '--password' => 'secreta123'])
+            ->assertSuccessful();
+        $this->assertTrue(auth()->attempt(['email' => 'ana@escuela.mx', 'password' => 'secreta123']));
+
+        $this->artisan('maestra:cuenta', ['email' => 'ana@escuela.mx', '--password' => 'otra12345'])->assertSuccessful();
+        $this->assertTrue(auth()->attempt(['email' => 'ana@escuela.mx', 'password' => 'otra12345']));
+        $this->assertSame(1, User::where('email', 'ana@escuela.mx')->count());
+
+        $this->artisan('maestra:cuenta', ['email' => 'nueva@escuela.mx'])->assertFailed(); // falta --nombre
+    }
+
+    public function test_registration_can_be_closed(): void
+    {
+        config(['rubrica.registration' => false]);
+        $this->get(route('register'))->assertNotFound();
+        $this->post(route('register'), ['name' => 'X', 'email' => 'x@x.mx', 'password' => 'secreta123', 'password_confirmation' => 'secreta123'])
+            ->assertNotFound();
+    }
+
     public function test_main_screens_render(): void
     {
         $project = $this->projectWithCriteria();
