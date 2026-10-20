@@ -165,6 +165,8 @@ class GroupsAndStudentsTest extends TestCase
         $this->assertSame(1, User::where('email', 'ana@escuela.mx')->count());
 
         $this->artisan('maestra:cuenta', ['email' => 'nueva@escuela.mx'])->assertFailed();
+
+        $this->artisan('maestra:lista')->expectsOutputToContain('ana@escuela.mx')->assertSuccessful();
     }
 
     public function test_registration_can_be_closed(): void
