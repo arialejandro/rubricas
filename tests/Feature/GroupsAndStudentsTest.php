@@ -169,6 +169,28 @@ class GroupsAndStudentsTest extends TestCase
         $this->artisan('maestra:lista')->expectsOutputToContain('ana@escuela.mx')->assertSuccessful();
     }
 
+    public function test_teacher_changes_her_own_password_and_data(): void
+    {
+        $this->teacher->update(['password' => 'generica123']);
+        $this->actingAs($this->teacher)->get(route('account.edit'))->assertOk()->assertSee('Cambiar contraseña');
+
+        $this->actingAs($this->teacher)->put(route('account.password'), [
+            'current_password' => 'equivocada', 'password' => 'MiClave2026', 'password_confirmation' => 'MiClave2026',
+        ])->assertSessionHasErrors('current_password');
+
+        $this->actingAs($this->teacher)->put(route('account.password'), [
+            'current_password' => 'generica123', 'password' => 'MiClave2026', 'password_confirmation' => 'otra',
+        ])->assertSessionHasErrors('password');
+
+        $this->actingAs($this->teacher)->put(route('account.password'), [
+            'current_password' => 'generica123', 'password' => 'MiClave2026', 'password_confirmation' => 'MiClave2026',
+        ])->assertSessionHasNoErrors();
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('MiClave2026', $this->teacher->fresh()->password));
+
+        $this->actingAs($this->teacher)->put(route('account.update'), ['name' => 'Ivonne', 'email' => 'nuevo@escuela.mx'])->assertSessionHasNoErrors();
+        $this->assertSame('nuevo@escuela.mx', $this->teacher->fresh()->email);
+    }
+
     public function test_registration_can_be_closed(): void
     {
         config(['rubrica.registration' => false]);

@@ -72,6 +72,8 @@
                         <x-icon name="sun" class="hidden dark:block" />
                     </button>
 
+                    <a href="{{ route('account.edit') }}" class="btn btn-ghost btn-icon" aria-label="Mi cuenta" title="Mi cuenta ({{ auth()->user()->name }})"><x-icon name="user" /></a>
+
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button class="btn btn-ghost btn-icon" aria-label="Cerrar sesión" title="Cerrar sesión ({{ auth()->user()->name }})"><x-icon name="logout" /></button>

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CampoController;
 use App\Http\Controllers\CaptureController;
@@ -24,6 +25,10 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
+
+    Route::get('cuenta', [AccountController::class, 'edit'])->name('account.edit');
+    Route::put('cuenta', [AccountController::class, 'update'])->name('account.update');
+    Route::put('cuenta/contrasena', [AccountController::class, 'password'])->name('account.password');
 
     Route::get('/', DashboardController::class)->name('dashboard');
 
