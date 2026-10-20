@@ -45,7 +45,8 @@
             </div>
         @endif
 
-        {{-- Aspectos y materias como tarjetas: tap → capturar --}}
+        {{-- Aspectos del trimestre: tap → capturar (los calculados llevan a lo que los alimenta) --}}
+        <h2 class="mb-3 text-lg font-bold">Aspectos del trimestre</h2>
         <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
             @foreach ($aspects as $a)
                 @if ($a->isFromProjects())
@@ -65,16 +66,16 @@
                         </ul>
                     </div>
                 @elseif ($a->isFromSkills())
-                    <div class="tile min-h-32 cursor-default hover:border-line active:scale-100">
+                    <a href="{{ $skills->isEmpty() ? route('campos.edit', [$group, $campo]) : route('capture.skill', [$group, $skills->first()]) }}" class="tile min-h-32 border-primary/50">
                         <div class="flex items-start justify-between gap-2">
                             <span class="rounded-lg bg-surface-2 px-2 py-1 text-sm font-bold tabular-nums">{{ TermBook::fmt($a->weight) }}%</span>
-                            <x-icon name="clipboard" class="size-5 text-ink-muted" />
+                            <x-icon name="chevron-right" class="size-5 text-ink-muted" />
                         </div>
                         <h3 class="text-lg font-bold leading-snug">{{ $a->name }}</h3>
-                        <p class="mt-auto text-xs {{ $skills->isEmpty() ? 'text-pending' : 'text-ink-muted' }}">
-                            {{ $skills->isEmpty() ? 'Sin habilidades definidas' : 'Promedio de '.$skills->count().' habilidades' }}
+                        <p class="mt-auto text-xs font-semibold {{ $skills->isEmpty() ? 'text-pending' : 'text-primary' }}">
+                            {{ $skills->isEmpty() ? 'Definir habilidades' : 'Calificar '.$skills->count().' habilidades' }}
                         </p>
-                    </div>
+                    </a>
                 @else
                     @php($m = $book->aspectMissing($a))
                     <a href="{{ route('capture.aspect', [$group, $a]) }}" class="tile min-h-32">
@@ -93,6 +94,13 @@
                     </a>
                 @endif
             @endforeach
+        </div>
+
+        @if ($skills->isNotEmpty())
+            <section id="habilidades" class="mb-6 scroll-mt-24">
+                <h2 class="text-lg font-bold">Habilidades prioritarias</h2>
+                <p class="mb-3 text-sm text-ink-muted">Toca una habilidad para calificar a todo el grupo por nivel. Su promedio es el aspecto "{{ $aspects->first(fn ($a) => $a->isFromSkills())->name }}".</p>
+                <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
             @foreach ($skills as $skill)
                 @php($m = $book->skillMissing($skill))
                 <a href="{{ route('capture.skill', [$group, $skill]) }}" class="tile min-h-32">
@@ -110,6 +118,14 @@
                     </div>
                 </a>
             @endforeach
+                </div>
+            </section>
+        @endif
+
+        @if ($subjects->isNotEmpty())
+            <h2 class="text-lg font-bold">Materias adicionales</h2>
+            <p class="mb-3 text-sm text-ink-muted">Promedian en partes iguales con el campo.</p>
+            <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
             @foreach ($subjects as $sub)
                 @php($m = $book->subjectMissing($sub))
                 <a href="{{ route('capture.subject', [$group, $sub]) }}" class="tile min-h-32 border-dashed">
@@ -127,7 +143,8 @@
                     </div>
                 </a>
             @endforeach
-        </div>
+            </div>
+        @endif
 
         @if (abs($book->totalWeight($campo) - 100) >= 0.01)
             <p class="mb-4 rounded-xl bg-danger-soft p-3 text-sm font-semibold text-danger">Los aspectos suman {{ TermBook::fmt($book->totalWeight($campo)) }}%; deben sumar 100%.</p>
