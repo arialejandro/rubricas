@@ -43,8 +43,10 @@
         </div>
         <x-progress :value="(int) floor(($total - $missing) * 100 / max(1, $total))" :bar="$unitKey" class="mb-4" />
 
-        {{-- La rúbrica a la vista mientras se califica --}}
-        @if ($descriptors)
+        {{-- La rúbrica (o la tabla de equivalencias de la medición) a la vista mientras se califica --}}
+        @if ($mode === 'measure')
+            <x-skill-ranges :skill="$unit" :title="false" class="mb-4" />
+        @elseif ($descriptors)
             <details class="card group mb-4" open>
                 <summary class="flex min-h-12 list-none items-center gap-2 px-4 text-sm font-semibold">
                     {{ $mode === 'measure' ? 'Rangos de calificación' : ($kind === 'skill' ? 'Niveles de la habilidad' : 'Rúbrica del criterio') }} <x-icon name="chevron-right" class="ml-auto size-4 transition group-open:rotate-90" />
@@ -65,6 +67,14 @@
         </div>
 
         <ul class="card divide-y divide-line" data-score-url="{{ route('score.update', $group) }}" data-descriptors="{{ $descriptorsJson }}">
+            @if ($mode === 'measure')
+                <li class="flex items-center gap-3 bg-surface-2 px-4 py-2 text-xs font-semibold text-ink-muted">
+                    <span class="w-7 text-right">N.L.</span>
+                    <span class="flex-1">Alumno</span>
+                    <span class="min-w-20 text-center">{{ ucfirst($unit->measure_unit) }}</span>
+                    <span class="min-w-32 text-center">Calificación</span>
+                </li>
+            @endif
             @foreach ($book->students as $s)
                 @php($score = $value($s))
                 <li class="flex min-h-16 items-center gap-3 px-4 py-2"
@@ -73,7 +83,7 @@
                     <span class="w-7 text-right text-sm font-semibold tabular-nums text-ink-muted">{{ $s->list_number }}</span>
                     <span class="min-w-0 flex-1 text-base font-medium">{{ $s->name }}</span>
                     <x-score :kind="$kind" :id="$unit->id" :term="in_array($kind, ['subject', 'skill'], true) ? $term : null" :student="$s" :unit="$title" :value="$score"
-                                 :mode="$mode" :measure="$measure ? $measure($s) : null" class="min-h-14 min-w-20 text-xl" />
+                                 :mode="$mode" :measure="$measure ? $measure($s) : null" :labels="$mode === 'measure' ? $labels : null" class="min-h-14 min-w-20 text-xl" />
                 </li>
             @endforeach
             <li class="p-6 text-center text-ink-muted" data-search-empty hidden>Ningún alumno coincide.</li>

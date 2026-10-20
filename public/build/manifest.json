@@ -224,7 +224,7 @@
     "src": "node_modules/@fontsource/fira-sans/files/fira-sans-vietnamese-700-normal.woff2"
   },
   "resources/css/app.css": {
-    "file": "assets/app-7xtAY9h6.css",
+    "file": "assets/app-CCOvWSdF.css",
     "name": "app",
     "names": [
       "app.css"
@@ -233,7 +233,7 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-CJe2VANh.js",
+    "file": "assets/app-BHbFTLBK.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,

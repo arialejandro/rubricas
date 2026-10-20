@@ -120,6 +120,39 @@ class Skill extends Model
         ];
     }
 
+    /**
+     * Tabla de equivalencias de una habilidad medible, de 6 a 10:
+     * [['score' => 6, 'level' => 'apoyo', 'label' => 'Requiere apoyo', 'range' => 'menos de 85'], …].
+     * Si los cortes son enteros se muestran rangos cerrados ("100 a 114").
+     *
+     * @return list<array{score:int, level:string, label:string, range:string}>
+     */
+    public function scoreBands(): array
+    {
+        $t = [7 => $this->min_7, 8 => $this->min_8, 9 => $this->min_9, 10 => $this->min_10];
+        $f = fn ($n) => rtrim(rtrim(number_format((float) $n, 2, '.', ''), '0'), '.');
+        $int = collect($t)->every(fn ($v) => $v !== null && floor($v) == $v);
+
+        if ($this->lower_is_better) {
+            $range = [6 => 'más de '.$f($t[7]), 10 => $f($t[10]).' o menos'];
+            foreach ([7, 8, 9] as $s) {
+                $range[$s] = ($int ? $f($t[$s + 1] + 1) : 'más de '.$f($t[$s + 1])).' a '.$f($t[$s]);
+            }
+        } else {
+            $range = [6 => 'menos de '.$f($t[7]), 10 => $f($t[10]).' o más'];
+            foreach ([7, 8, 9] as $s) {
+                $range[$s] = $f($t[$s]).' a '.($int ? $f($t[$s + 1] - 1) : 'menos de '.$f($t[$s + 1]));
+            }
+        }
+
+        return array_map(fn ($s) => [
+            'score' => $s,
+            'level' => Level::of($s),
+            'label' => $this->levelLabel(Level::of($s)),
+            'range' => $range[$s],
+        ], [6, 7, 8, 9, 10]);
+    }
+
     /** Lo que el teclado necesita para calcular el nivel en vivo. */
     public function keypadConfig(): array
     {

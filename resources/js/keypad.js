@@ -338,7 +338,19 @@ function setCell(cell, value, state = null, measure = null) {
     if (cell.dataset.mode === 'measure') {
         cell.dataset.measure = empty || measure === null ? '' : String(measure);
         cell.textContent = empty ? '—' : fmt(cell.dataset.measure || cell.dataset.value);
-        cell.title = empty ? '' : `Calificación ${fmt(cell.dataset.value)}`;
+        // Calificación fija junto a la medición (components/score.blade.php).
+        const badge = cell.parentElement.querySelector('[data-measure-score]');
+        if (badge) {
+            const lvl = levelOf(cell.dataset.value);
+            let labels = null;
+            try {
+                labels = badge.dataset.labels ? JSON.parse(badge.dataset.labels) : null;
+            } catch (e) {
+                labels = null;
+            }
+            badge.textContent = empty ? '—' : `${fmt(cell.dataset.value)}${labels ? ' · ' + (labels[lvl] ?? '') : ''}`;
+            empty ? badge.removeAttribute('data-level') : (badge.dataset.level = lvl);
+        }
     } else {
         cell.textContent = empty ? '—' : fmt(cell.dataset.value);
     }

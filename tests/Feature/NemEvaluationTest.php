@@ -146,7 +146,15 @@ class NemEvaluationTest extends TestCase
             $this->assertSame($score, $speed->scoreFor($ppm), "{$ppm} ppm");
         }
 
+        // Tabla "a qué corresponde cada valor" que se muestra encima de la lista.
+        $this->assertSame(
+            [[6, 'Requiere apoyo', 'menos de 85'], [7, 'Se acerca al estándar', '85 a 91'], [8, 'Se acerca al estándar', '92 a 99'], [9, 'Estándar', '100 a 114'], [10, 'Avanzado', '115 o más']],
+            array_map(fn ($b) => [$b['score'], $b['label'], $b['range']], $speed->scoreBands()),
+        );
+
         $this->group->termAspects()->create(['term' => 1, 'campo' => 'lenguajes', 'name' => 'Habilidades', 'type' => 'skills', 'weight' => 10]);
+        $this->actingAs($this->teacher)->get(route('capture.skill', [$this->group, $speed]))
+            ->assertOk()->assertSee('100 a 114')->assertSee('data-measure-score', false);
         $this->actingAs($this->teacher)->putJson(route('score.update', $this->group), [
             'kind' => 'skill', 'id' => $speed->id, 'student_id' => $this->ana->id, 'term' => 1, 'measure' => '103',
         ])->assertOk()->assertJsonPath('score', 9)->assertJsonPath('measure', 103)->assertJsonPath('level', 'satisfactorio');

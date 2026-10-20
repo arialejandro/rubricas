@@ -150,6 +150,11 @@
             <p class="mb-4 rounded-xl bg-danger-soft p-3 text-sm font-semibold text-danger">Los aspectos suman {{ TermBook::fmt($book->totalWeight($campo)) }}%; deben sumar 100%.</p>
         @endif
 
+        {{-- Equivalencias de las habilidades que se miden (a qué calificación corresponde cada rango) --}}
+        @foreach ($skills->filter->isMeasured() as $skill)
+            <x-skill-ranges :skill="$skill" class="mb-3" />
+        @endforeach
+
         {{-- Matriz del campo --}}
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 class="text-lg font-bold">Calificaciones del campo</h2>
@@ -170,7 +175,7 @@
                             </th>
                         @endforeach
                         @foreach ($skills as $skill)
-                            <th class="bg-primary-soft/40 px-2 py-3 text-center font-semibold"><span class="block max-w-28 truncate text-ink" title="{{ $skill->name }}">{{ $skill->name }}</span><span class="text-xs font-normal">habilidad</span></th>
+                            <th class="bg-primary-soft/40 px-2 py-3 text-center font-semibold"><span class="block max-w-36 truncate text-ink" title="{{ $skill->name }}">{{ $skill->name }}</span><span class="text-xs font-normal">{{ $skill->isMeasured() ? $skill->measure_unit.' → calif.' : 'habilidad' }}</span></th>
                         @endforeach
                         @if ($subjects->isNotEmpty())
                             <th class="px-2 py-3 text-center font-semibold text-ink">Base</th>
