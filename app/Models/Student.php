@@ -24,6 +24,7 @@ class Student extends Model
     {
         return CriterionScore::where('student_id', $this->id)->exists()
             || AspectScore::where('student_id', $this->id)->exists()
-            || SubjectScore::where('student_id', $this->id)->exists();
+            || SubjectScore::where('student_id', $this->id)->exists()
+            || SkillScore::where('student_id', $this->id)->exists();
     }
 }

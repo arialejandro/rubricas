@@ -8,6 +8,8 @@ use App\Models\CriterionScore;
 use App\Models\Group;
 use App\Models\Product;
 use App\Models\Project;
+use App\Models\Skill;
+use App\Models\SkillScore;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Models\SubjectScore;
@@ -39,6 +41,12 @@ class TermBook
 
     /** @var array<int, array<int, float>> [student][subject] */
     private array $sub = [];
+
+    /** @var array<int, array<int, int>> [student][skill] */
+    private array $skl = [];
+
+    /** @var Collection<int, Skill> */
+    public Collection $skills;
 
     private function __construct(
         public readonly Group $group,
@@ -83,6 +91,11 @@ class TermBook
             ->get(['subject_id', 'student_id', 'score'])
             ->each(function ($r) use ($book) { $book->sub[$r->student_id][$r->subject_id] = $r->score; });
 
+        $book->skills = $group->skills()->get();
+        SkillScore::whereIn('skill_id', $book->skills->pluck('id'))->whereIn('student_id', $ids)->where('term', $term)
+            ->get(['skill_id', 'student_id', 'score'])
+            ->each(function ($r) use ($book) { $book->skl[$r->student_id][$r->skill_id] = $r->score; });
+
         return $book;
     }
 
@@ -112,9 +125,35 @@ class TermBook
         return $this->projects->flatMap->products->flatMap->criteria;
     }
 
+    /** @return Collection<int, TermAspect> aspectos que se capturan alumno por alumno */
+    public function directAspectsFor(string $campo): Collection
+    {
+        return $this->aspectsFor($campo)->filter->isDirect()->values();
+    }
+
+    /**
+     * @return Collection<int, Skill> habilidades prioritarias que CUENTAN en el campo este trimestre
+     *                                (solo si el campo tiene un aspecto de tipo "skills")
+     */
+    public function skillsFor(string $campo): Collection
+    {
+        return $this->hasSkillsAspect($campo) ? $this->allSkillsFor($campo) : collect();
+    }
+
+    /** @return Collection<int, Skill> todas las habilidades del campo, cuenten o no */
+    public function allSkillsFor(string $campo): Collection
+    {
+        return $this->skills->where('campo', $campo)->values();
+    }
+
     public function hasProjectsAspect(string $campo): bool
     {
         return $this->aspectsFor($campo)->contains(fn ($a) => $a->isFromProjects());
+    }
+
+    public function hasSkillsAspect(string $campo): bool
+    {
+        return $this->aspectsFor($campo)->contains(fn ($a) => $a->isFromSkills());
     }
 
     public function totalWeight(string $campo): float
@@ -144,6 +183,11 @@ class TermBook
         return $this->sub[$studentId][$subjectId] ?? null;
     }
 
+    public function skillScore(int $studentId, int $skillId): ?int
+    {
+        return $this->skl[$studentId][$skillId] ?? null;
+    }
+
     // ---------------------------------------------------------------- derivadas
 
     public function productScore(Product $product, Student $s): ?float
@@ -166,11 +210,21 @@ class TermBook
         return $scores->isEmpty() ? null : round($scores->avg(), 2);
     }
 
+    /** Valor del aspecto "Habilidades prioritarias": promedio de las habilidades calificadas. */
+    public function skillsValue(string $campo, Student $s): ?float
+    {
+        $scores = $this->allSkillsFor($campo)->map(fn ($k) => $this->skillScore($s->id, $k->id))->filter(fn ($v) => $v !== null);
+
+        return $scores->isEmpty() ? null : round($scores->avg(), 2);
+    }
+
     public function aspectValue(TermAspect $aspect, Student $s): ?float
     {
-        return $aspect->isFromProjects()
-            ? $this->projectsValue($aspect->campo, $s)
-            : $this->aspectScore($s->id, $aspect->id);
+        return match ($aspect->type) {
+            'projects' => $this->projectsValue($aspect->campo, $s),
+            'skills' => $this->skillsValue($aspect->campo, $s),
+            default => $this->aspectScore($s->id, $aspect->id),
+        };
     }
 
     /** Σ aspecto × peso, repartiendo el peso entre los aspectos que ya tienen valor. */
@@ -221,17 +275,18 @@ class TermBook
     // ---------------------------------------------------------------- pendientes
 
     /**
-     * Celdas por alumno en el campo: criterios de sus productos + aspectos directos + materias.
-     * Un aspecto "Proyectos" sin ningún producto en el campo cuenta como 1 pendiente
-     * (falta planear el proyecto o quitar el aspecto).
+     * Celdas por alumno en el campo: criterios de sus productos + aspectos directos + habilidades
+     * (si el campo las evalúa) + materias. Un aspecto "Proyectos" sin productos, o "Habilidades"
+     * sin habilidades, cuenta como 1 pendiente (falta planearlo o quitar el aspecto).
      */
     public function campoCellsPerStudent(string $campo): int
     {
         $n = $this->productsFor($campo)->sum(fn ($p) => $p->criteria->count())
-            + $this->aspectsFor($campo)->reject->isFromProjects()->count()
+            + $this->directAspectsFor($campo)->count()
+            + $this->skillsFor($campo)->count()
             + $this->subjectsFor($campo)->count();
 
-        return $n + ($this->projectsAspectWithoutProducts($campo) ? 1 : 0);
+        return $n + $this->structuralGaps($campo);
     }
 
     public function projectsAspectWithoutProducts(string $campo): bool
@@ -239,13 +294,29 @@ class TermBook
         return $this->hasProjectsAspect($campo) && $this->productsFor($campo)->sum(fn ($p) => $p->criteria->count()) === 0;
     }
 
+    public function skillsAspectWithoutSkills(string $campo): bool
+    {
+        return $this->hasSkillsAspect($campo) && $this->allSkillsFor($campo)->isEmpty();
+    }
+
+    private function structuralGaps(string $campo): int
+    {
+        return ($this->projectsAspectWithoutProducts($campo) ? 1 : 0) + ($this->skillsAspectWithoutSkills($campo) ? 1 : 0);
+    }
+
     public function campoMissing(string $campo, Student $s): int
     {
         $missing = $this->productsFor($campo)->sum(fn ($p) => $this->productMissing($p, $s))
-            + $this->aspectsFor($campo)->reject->isFromProjects()->filter(fn ($a) => $this->aspectScore($s->id, $a->id) === null)->count()
+            + $this->directAspectsFor($campo)->filter(fn ($a) => $this->aspectScore($s->id, $a->id) === null)->count()
+            + $this->skillsFor($campo)->filter(fn ($k) => $this->skillScore($s->id, $k->id) === null)->count()
             + $this->subjectsFor($campo)->filter(fn ($sub) => $this->subjectScore($s->id, $sub->id) === null)->count();
 
-        return $missing + ($this->projectsAspectWithoutProducts($campo) ? 1 : 0);
+        return $missing + $this->structuralGaps($campo);
+    }
+
+    public function skillMissing(Skill $skill): int
+    {
+        return $this->students->filter(fn ($s) => $this->skillScore($s->id, $skill->id) === null)->count();
     }
 
     public function campoComplete(string $campo, Student $s): bool
@@ -351,6 +422,10 @@ class TermBook
         $pv = $this->projectsValue($campo, $s);
         $out['text']["projects:{$campo}:{$s->id}"] = self::fmt($pv);
         $out['level']["projects:{$campo}:{$s->id}"] = Level::of($pv);
+
+        $sv = $this->skillsValue($campo, $s);
+        $out['text']["skills:{$campo}:{$s->id}"] = self::fmt($sv);
+        $out['level']["skills:{$campo}:{$s->id}"] = Level::of($sv);
 
         if ($product) {
             $ps = $this->productScore($product, $s);

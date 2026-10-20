@@ -6,7 +6,7 @@ use App\Models\AspectScore;
 use App\Models\Criterion;
 use App\Models\CriterionScore;
 use App\Models\Group;
-use App\Models\Subject;
+use App\Models\SkillScore;
 use App\Models\SubjectScore;
 use App\Models\TermAspect;
 use App\Support\Campos;
@@ -31,7 +31,7 @@ class ScoreController extends Controller
         $request->merge(['score' => $raw === '' ? null : $raw]);
 
         $data = $request->validate([
-            'kind' => ['required', Rule::in(['criterion', 'aspect', 'subject'])],
+            'kind' => ['required', Rule::in(['criterion', 'aspect', 'subject', 'skill'])],
             'id' => ['required', 'integer'],
             'student_id' => ['required', 'integer', Rule::exists('students', 'id')->where('group_id', $group->id)->where('active', true)],
             'term' => ['nullable', 'integer', Rule::in(Campos::TERMS)],
@@ -49,17 +49,20 @@ class ScoreController extends Controller
             'criterion' => $this->criterion($group, (int) $data['id'], $score),
             'aspect' => $this->aspect($group, (int) $data['id']),
             'subject' => $this->subject($group, (int) $data['id'], $data['term'] ?? $group->term()),
+            'skill' => $this->skill($group, (int) $data['id'], $data['term'] ?? $group->term(), $score),
         };
 
         $key = match ($data['kind']) {
             'criterion' => ['criterion_id' => $model->id, 'student_id' => $studentId],
             'aspect' => ['term_aspect_id' => $model->id, 'student_id' => $studentId],
             'subject' => ['subject_id' => $model->id, 'student_id' => $studentId, 'term' => $term],
+            'skill' => ['skill_id' => $model->id, 'student_id' => $studentId, 'term' => $term],
         };
         $class = match ($data['kind']) {
             'criterion' => CriterionScore::class,
             'aspect' => AspectScore::class,
             'subject' => SubjectScore::class,
+            'skill' => SkillScore::class,
         };
 
         $score === null
@@ -72,6 +75,7 @@ class ScoreController extends Controller
             'criterion' => $book->criterionMissing($model),
             'aspect' => $book->aspectMissing($model),
             'subject' => $book->subjectMissing($model),
+            'skill' => $book->skillMissing($model),
         };
 
         return response()->json([
@@ -87,15 +91,28 @@ class ScoreController extends Controller
         $criterion = Criterion::with('product.project')->findOrFail($id);
         abort_unless($criterion->product->project->group_id === $group->id, 404);
 
-        // Un criterio se califica por nivel: 10 Logrado, 9 Satisfactorio, 8/7 En proceso, 6 Requiere apoyo.
+        $this->ensureLevel($score);
+
+        return [$criterion->product->project->term, $criterion->product->campo, $criterion->product, "criterion:{$id}", $criterion];
+    }
+
+    private function skill(Group $group, int $id, int $term, ?float $score): array
+    {
+        $skill = $group->skills()->findOrFail($id);
+        $this->ensureLevel($score);
+
+        return [$term, $skill->campo, null, "skill:{$id}", $skill];
+    }
+
+    /** Criterios y habilidades se califican por nivel: 10 Logrado, 9 Satisfactorio, 8/7 En proceso, 6 Requiere apoyo. */
+    private function ensureLevel(?float $score): void
+    {
         if ($score !== null && ! in_array($score, array_map('floatval', Level::CRITERION_SCORES), true)) {
             abort(response()->json([
                 'message' => 'Elige un nivel: 10, 9, 8, 7 o 6.',
                 'errors' => ['score' => ['Elige un nivel: 10, 9, 8, 7 o 6.']],
             ], 422));
         }
-
-        return [$criterion->product->project->term, $criterion->product->campo, $criterion->product, "criterion:{$id}", $criterion];
     }
 
     private function aspect(Group $group, int $id): array

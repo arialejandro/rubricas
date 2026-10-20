@@ -4,8 +4,13 @@
     $fmt = fn ($n) => rtrim(rtrim(number_format((float) $n, 2, '.', ''), '0'), '.');
     $rows = old('aspects', $aspects->isNotEmpty()
         ? $aspects->map(fn ($a) => ['id' => $a->id, 'name' => $a->name, 'type' => $a->type, 'weight' => $fmt($a->weight), 'graded' => $a->scores_count])->all()
-        : Campos::DEFAULT_ASPECTS);
+        : Campos::defaultAspects($campo));
     $subjectRows = old('subjects', $subjects->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->all());
+    $skillRows = old('skills', $skills->map(fn ($k) => [
+        'id' => $k->id, 'name' => $k->name, 'graded' => $k->scores_count,
+        'level_logrado' => $k->level_logrado, 'level_satisfactorio' => $k->level_satisfactorio,
+        'level_proceso' => $k->level_proceso, 'level_apoyo' => $k->level_apoyo,
+    ])->all());
 @endphp
 <x-layouts.app :title="'Evaluación · '.Campos::short($campo)" hide-term>
     <x-slot:breadcrumbs>
@@ -33,7 +38,8 @@
             <section class="card space-y-4 p-5 sm:p-6" data-repeater data-max="{{ Campos::MAX_ASPECTS }}">
                 <div>
                     <h2 class="text-lg font-bold">Aspectos</h2>
-                    <p class="text-sm text-ink-muted"><strong>De los proyectos</strong>: toma el promedio de los productos evaluados en este campo, de cualquier proyecto. <strong>Captura directa</strong>: se califica del 0 al 10 (examen, tareas…).</p>
+                    <p class="text-sm text-ink-muted"><strong>De los proyectos</strong>: toma el promedio de los productos evaluados en este campo, de cualquier proyecto. <strong>Captura directa</strong>: se califica del 0 al 10 (examen, tareas…).
+                        @if (Campos::hasSkills($campo)) <strong>Habilidades prioritarias</strong>: promedio de las habilidades de abajo, calificadas por nivel. @endif</p>
                 </div>
 
                 <div class="space-y-3" data-repeater-list>
@@ -56,6 +62,23 @@
                 </div>
             </section>
 
+            @if (Campos::hasSkills($campo))
+                <section class="card space-y-4 p-5 sm:p-6" data-repeater data-max="8">
+                    <div>
+                        <h2 class="text-lg font-bold">Habilidades prioritarias</h2>
+                        <p class="text-sm text-ink-muted">{{ $campo === 'lenguajes' ? 'Lectura y escritura: velocidad, fluidez, comprensión…' : 'Matemáticas: cálculo mental, resolución de problemas…' }}
+                            Se califican por nivel (Logrado 10, Satisfactorio 9, En proceso 8/7, Requiere apoyo 6) y suman al campo a través del aspecto "Habilidades prioritarias". Son las mismas en los tres trimestres.</p>
+                    </div>
+                    <div class="space-y-3" data-repeater-list>
+                        @foreach ($skillRows as $i => $row)
+                            @include('campos._skill-row', ['i' => $i, 'row' => $row])
+                        @endforeach
+                    </div>
+                    <template>@include('campos._skill-row', ['i' => '__INDEX__', 'row' => []])</template>
+                    <button type="button" class="btn btn-ghost" data-repeater-add><x-icon name="plus" class="size-4" /> Agregar habilidad</button>
+                </section>
+            @endif
+
             <section class="card space-y-4 p-5 sm:p-6" data-repeater data-max="4">
                 <div>
                     <h2 class="text-lg font-bold">Materias adicionales</h2>
@@ -72,7 +95,7 @@
 
             <label class="flex items-start gap-3 rounded-xl border border-line bg-surface p-3 text-sm text-ink-muted">
                 <input type="checkbox" name="confirm_remove" value="1" class="mt-0.5 size-5">
-                Si quito un aspecto o materia que ya tiene calificaciones, confirmo que se borren.
+                Si quito un aspecto, habilidad o materia que ya tiene calificaciones, confirmo que se borren.
             </label>
 
             <div class="flex justify-end gap-2">

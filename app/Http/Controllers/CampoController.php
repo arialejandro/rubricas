@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Group;
 use App\Models\TermAspect;
 use App\Support\Campos;
+use App\Support\Level;
 use App\Support\TermBook;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,10 +36,11 @@ class CampoController extends Controller
         $term = $group->term();
         $aspects = $group->termAspects()->where('term', $term)->where('campo', $campo)->withCount('scores')->get();
         $subjects = $group->subjects()->where('campo', $campo)->withCount('scores')->get();
+        $skills = Campos::hasSkills($campo) ? $group->skills()->where('campo', $campo)->withCount('scores')->get() : collect();
         $canCopy = $aspects->isEmpty() && $term > 1
             && $group->termAspects()->where('term', $term - 1)->where('campo', $campo)->exists();
 
-        return view('campos.edit', compact('group', 'campo', 'term', 'aspects', 'subjects', 'canCopy'));
+        return view('campos.edit', compact('group', 'campo', 'term', 'aspects', 'subjects', 'skills', 'canCopy'));
     }
 
     public function update(Request $request, Group $group, string $campo): RedirectResponse
@@ -51,17 +53,27 @@ class CampoController extends Controller
             ->map(fn ($a) => [...$a, 'weight' => str_replace(',', '.', trim($a['weight'] ?? ''))])
             ->values()->all();
         $subjects = collect($request->input('subjects', []))->filter(fn ($s) => trim($s['name'] ?? '') !== '')->values()->all();
-        $request->merge(['aspects' => $aspects, 'subjects' => $subjects]);
+        $skills = Campos::hasSkills($campo)
+            ? collect($request->input('skills', []))->filter(fn ($s) => trim($s['name'] ?? '') !== '')->values()->all()
+            : [];
+        $request->merge(['aspects' => $aspects, 'subjects' => $subjects, 'skills' => $skills]);
+
+        $types = Campos::hasSkills($campo) ? array_keys(TermAspect::TYPES) : ['projects', 'direct'];
+        $levelRules = collect(array_keys(Level::LEVELS))->mapWithKeys(fn ($l) => ['skills.*.'.Level::column($l) => ['nullable', 'string', 'max:1000']])->all();
 
         $data = $request->validate([
             'aspects' => ['required', 'array', 'min:1', 'max:'.Campos::MAX_ASPECTS],
             'aspects.*.id' => ['nullable', 'integer'],
             'aspects.*.name' => ['required', 'string', 'max:120'],
-            'aspects.*.type' => ['required', Rule::in(array_keys(TermAspect::TYPES))],
+            'aspects.*.type' => ['required', Rule::in($types)],
             'aspects.*.weight' => ['required', 'numeric', 'gt:0', 'max:100'],
             'subjects' => ['array', 'max:4'],
             'subjects.*.id' => ['nullable', 'integer'],
             'subjects.*.name' => ['required', 'string', 'max:80'],
+            'skills' => ['array', 'max:8'],
+            'skills.*.id' => ['nullable', 'integer'],
+            'skills.*.name' => ['required', 'string', 'max:120'],
+            ...$levelRules,
         ], [
             'aspects.required' => 'Agrega al menos un aspecto.',
             'aspects.max' => 'Máximo '.Campos::MAX_ASPECTS.' aspectos por campo.',
@@ -76,24 +88,39 @@ class CampoController extends Controller
         if (collect($data['aspects'])->where('type', 'projects')->count() > 1) {
             throw ValidationException::withMessages(['aspects' => 'Solo un aspecto puede tomar su calificación de los proyectos.']);
         }
+        if (collect($data['aspects'])->where('type', 'skills')->count() > 1) {
+            throw ValidationException::withMessages(['aspects' => 'Solo un aspecto puede tomar su calificación de las habilidades prioritarias.']);
+        }
 
         $aspectQuery = $group->termAspects()->where('term', $term)->where('campo', $campo);
         $removedAspects = (clone $aspectQuery)->whereNotIn('id', collect($data['aspects'])->pluck('id')->filter())->withCount('scores')->get();
         $subjectQuery = $group->subjects()->where('campo', $campo);
         $removedSubjects = (clone $subjectQuery)->whereNotIn('id', collect($data['subjects'] ?? [])->pluck('id')->filter())->withCount('scores')->get();
+        $skillQuery = $group->skills()->where('campo', $campo);
+        $removedSkills = Campos::hasSkills($campo)
+            ? (clone $skillQuery)->whereNotIn('id', collect($data['skills'] ?? [])->pluck('id')->filter())->withCount('scores')->get()
+            : collect();
 
         // Quitar algo que ya tiene calificaciones las borra: se pide confirmación explícita.
         $graded = $removedAspects->where('scores_count', '>', 0)->pluck('name')
-            ->merge($removedSubjects->where('scores_count', '>', 0)->pluck('name'));
+            ->merge($removedSubjects->where('scores_count', '>', 0)->pluck('name'))
+            ->merge($removedSkills->where('scores_count', '>', 0)->pluck('name'));
         if ($graded->isNotEmpty() && ! $request->boolean('confirm_remove')) {
             throw ValidationException::withMessages([
                 'confirm_remove' => 'Vas a quitar '.$graded->implode(', ').', que ya tienen calificaciones. Marca la casilla de confirmación para borrarlas.',
             ]);
         }
 
-        DB::transaction(function () use ($group, $term, $campo, $data, $removedAspects, $removedSubjects, $aspectQuery, $subjectQuery) {
+        DB::transaction(function () use ($group, $term, $campo, $data, $removedAspects, $removedSubjects, $removedSkills, $aspectQuery, $subjectQuery, $skillQuery) {
             $removedAspects->each->delete();
             $removedSubjects->each->delete();
+            $removedSkills->each->delete();
+
+            foreach ($data['skills'] ?? [] as $i => $k) {
+                $attrs = [...collect($k)->except('id')->all(), 'position' => $i];
+                $existing = ! empty($k['id']) ? (clone $skillQuery)->find($k['id']) : null;
+                $existing ? $existing->update($attrs) : $group->skills()->create([...$attrs, 'campo' => $campo]);
+            }
 
             foreach ($data['aspects'] as $i => $a) {
                 $attrs = ['name' => $a['name'], 'type' => $a['type'], 'weight' => $a['weight'], 'position' => $i];

@@ -21,12 +21,38 @@ final class Campos
         'humano' => ['Educación Física'],
     ];
 
+    /** Campos que evalúan habilidades prioritarias (lectura, escritura, matemáticas). */
+    public const SKILL_CAMPOS = ['lenguajes', 'saberes'];
+
+    /** Habilidades prioritarias que se crean con cada grupo (editables). */
+    public const DEFAULT_SKILLS = [
+        'lenguajes' => ['Velocidad lectora', 'Fluidez lectora', 'Comprensión lectora', 'Producción de textos'],
+        'saberes' => ['Cálculo mental', 'Resolución de problemas'],
+    ];
+
     /** Estrategia sugerida al configurar un campo por primera vez en un trimestre. */
     public const DEFAULT_ASPECTS = [
         ['name' => 'Proyectos', 'type' => 'projects', 'weight' => 50],
         ['name' => 'Examen', 'type' => 'direct', 'weight' => 30],
         ['name' => 'Tareas y participación', 'type' => 'direct', 'weight' => 20],
     ];
+
+    public const DEFAULT_ASPECTS_WITH_SKILLS = [
+        ['name' => 'Proyectos', 'type' => 'projects', 'weight' => 40],
+        ['name' => 'Habilidades prioritarias', 'type' => 'skills', 'weight' => 20],
+        ['name' => 'Examen', 'type' => 'direct', 'weight' => 25],
+        ['name' => 'Tareas y participación', 'type' => 'direct', 'weight' => 15],
+    ];
+
+    public static function hasSkills(string $campo): bool
+    {
+        return in_array($campo, self::SKILL_CAMPOS, true);
+    }
+
+    public static function defaultAspects(string $campo): array
+    {
+        return self::hasSkills($campo) ? self::DEFAULT_ASPECTS_WITH_SKILLS : self::DEFAULT_ASPECTS;
+    }
 
     public const MAX_ASPECTS = 6;
 

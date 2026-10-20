@@ -26,11 +26,17 @@ class Group extends Model
 
     protected static function booted(): void
     {
-        // Cada grupo nace con sus materias adicionales (Artes, Inglés, Educación Física).
+        // Cada grupo nace con sus materias adicionales (Artes, Inglés, Educación Física)
+        // y las habilidades prioritarias sugeridas de Lenguajes y Saberes (todo editable).
         static::created(function (Group $group) {
             foreach (Campos::DEFAULT_SUBJECTS as $campo => $names) {
                 foreach ($names as $i => $name) {
                     $group->subjects()->create(['campo' => $campo, 'name' => $name, 'position' => $i]);
+                }
+            }
+            foreach (Campos::DEFAULT_SKILLS as $campo => $names) {
+                foreach ($names as $i => $name) {
+                    $group->skills()->create(['campo' => $campo, 'name' => $name, 'position' => $i]);
                 }
             }
         });
@@ -59,6 +65,11 @@ class Group extends Model
     public function subjects(): HasMany
     {
         return $this->hasMany(Subject::class)->orderBy('position')->orderBy('id');
+    }
+
+    public function skills(): HasMany
+    {
+        return $this->hasMany(Skill::class)->orderBy('position')->orderBy('id');
     }
 
     public function termAspects(): HasMany

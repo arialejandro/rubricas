@@ -105,6 +105,57 @@ class NemEvaluationTest extends TestCase
         $this->assertFalse($book->campoComplete('lenguajes', $this->ana));
     }
 
+    public function test_priority_skills_add_to_campo_as_weighted_aspect(): void
+    {
+        $this->assertSame(
+            ['lenguajes' => ['Velocidad lectora', 'Fluidez lectora', 'Comprensión lectora', 'Producción de textos'], 'saberes' => ['Cálculo mental', 'Resolución de problemas']],
+            $this->group->skills()->get()->groupBy('campo')->map(fn ($s) => $s->pluck('name')->all())->all(),
+        );
+
+        $exam = $this->group->termAspects()->create(['term' => 1, 'campo' => 'saberes', 'name' => 'Examen', 'type' => 'direct', 'weight' => 50, 'position' => 1]);
+        $this->group->termAspects()->create(['term' => 1, 'campo' => 'saberes', 'name' => 'Habilidades prioritarias', 'type' => 'skills', 'weight' => 50, 'position' => 0]);
+        [$calc, $problems] = $this->group->skills()->where('campo', 'saberes')->get()->all();
+
+        // Por nivel: 7.5 no es un nivel.
+        $this->score('skill', $calc->id, $this->ana, '7.5', 1)->assertUnprocessable();
+        $this->score('skill', $calc->id, $this->ana, '10', 1)->assertOk()->assertJsonPath('paint.text.skills:saberes:'.$this->ana->id, '10');
+        $this->score('skill', $problems->id, $this->ana, '8', 1)->assertOk()->assertJsonPath('paint.text.skills:saberes:'.$this->ana->id, '9');
+        $this->score('aspect', $exam->id, $this->ana, '7')->assertOk();
+        $bitacora = $this->project->products()->where('name', 'Bitácora')->first()->criteria()->first();
+        $this->score('criterion', $bitacora->id, $this->ana, '9')->assertOk();
+
+        $book = TermBook::for($this->group->fresh(), 1);
+        // Habilidades = (10+8)/2 = 9; Base = 9×50% + 7×50% = 8.
+        $this->assertSame(9.0, $book->skillsValue('saberes', $this->ana));
+        $this->assertSame(8.0, $book->campoFinal('saberes', $this->ana));
+        $this->assertTrue($book->campoComplete('saberes', $this->ana));
+
+        // Las habilidades solo cuentan si el campo tiene el aspecto: Lenguajes no lo tiene aquí.
+        $this->assertCount(0, $book->skillsFor('lenguajes'));
+        $this->assertSame(4, $book->campoMissing('saberes', $this->bruno)); // 2 habilidades + examen + criterio de la bitácora
+    }
+
+    public function test_skills_aspect_only_in_lenguajes_and_saberes(): void
+    {
+        $payload = ['aspects' => [
+            ['name' => 'Habilidades', 'type' => 'skills', 'weight' => '50'],
+            ['name' => 'Examen', 'type' => 'direct', 'weight' => '50'],
+        ], 'subjects' => []];
+
+        $this->actingAs($this->teacher)->put(route('campos.update', [$this->group, 'etica']), $payload)->assertSessionHasErrors('aspects.0.type');
+
+        $this->actingAs($this->teacher)->put(route('campos.update', [$this->group, 'saberes']), [...$payload, 'skills' => [
+            ['name' => 'Cálculo mental', 'level_logrado' => 'Resuelve 10 de 10'],
+            ['name' => 'Estimación'],
+        ]])->assertSessionHasNoErrors();
+
+        $this->assertSame(['Cálculo mental', 'Estimación'], $this->group->skills()->where('campo', 'saberes')->pluck('name')->all());
+        $this->assertSame('Resuelve 10 de 10', $this->group->skills()->where('name', 'Cálculo mental')->value('level_logrado'));
+
+        $skill = $this->group->skills()->where('name', 'Estimación')->first();
+        $this->actingAs($this->teacher)->get(route('capture.skill', [$this->group, $skill]))->assertOk()->assertSee('Estimación');
+    }
+
     public function test_criteria_only_accept_level_scores(): void
     {
         $this->score('criterion', $this->c1->id, $this->ana, '7.5')->assertUnprocessable();

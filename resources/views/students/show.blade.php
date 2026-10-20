@@ -34,7 +34,8 @@
                     $final = $book->campoFinal($campo, $s);
                     $complete = $book->campoComplete($campo, $s);
                 @endphp
-                <section class="card overflow-hidden" style="--c: {{ Campos::color($campo) }}" data-score-url="{{ route('score.update', $group) }}">
+                <section class="card overflow-hidden" style="--c: {{ Campos::color($campo) }}" data-score-url="{{ route('score.update', $group) }}"
+                         data-descriptors="{{ json_encode($book->skillsFor($campo)->mapWithKeys(fn ($k) => [$k->id => $k->descriptors()]), JSON_UNESCAPED_UNICODE) }}">
                     <div class="flex items-start justify-between gap-3 border-b border-line p-4">
                         <div>
                             <x-campo-chip :campo="$campo" />
@@ -68,9 +69,18 @@
                                     @if ($a->isFromProjects())
                                         @php($pv = $book->projectsValue($campo, $s))
                                         <span class="lvl-text inline-grid min-h-12 min-w-14 place-items-center text-lg font-bold tabular-nums" data-paint="projects:{{ $campo }}:{{ $s->id }}" @if ($pv !== null) data-level="{{ Level::of($pv) }}" @endif>{{ TermBook::fmt($pv) }}</span>
+                                    @elseif ($a->isFromSkills())
+                                        @php($sv = $book->skillsValue($campo, $s))
+                                        <span class="lvl-text inline-grid min-h-12 min-w-14 place-items-center text-lg font-bold tabular-nums" data-paint="skills:{{ $campo }}:{{ $s->id }}" @if ($sv !== null) data-level="{{ Level::of($sv) }}" @endif>{{ TermBook::fmt($sv) }}</span>
                                     @else
                                         <x-score kind="aspect" :id="$a->id" :student="$s" :unit="$a->name" :value="$book->aspectScore($s->id, $a->id)" />
                                     @endif
+                                </li>
+                            @endforeach
+                            @foreach ($book->skillsFor($campo) as $skill)
+                                <li class="flex min-h-14 items-center gap-3 bg-primary-soft/30 py-2 pr-4 pl-8">
+                                    <span class="flex-1 font-medium">{{ $skill->name }} <span class="text-xs text-ink-muted">habilidad</span></span>
+                                    <x-score kind="skill" :id="$skill->id" :term="$book->term" :student="$s" :unit="$skill->name" :value="$book->skillScore($s->id, $skill->id)" />
                                 </li>
                             @endforeach
                             @foreach ($book->subjectsFor($campo) as $sub)

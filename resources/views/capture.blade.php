@@ -7,7 +7,7 @@
 @php
     $total = $book->students->count();
     $kind = $kind;
-    $descriptorsJson = $kind === 'criterion' ? json_encode([$unit->id => $descriptors], JSON_UNESCAPED_UNICODE) : '{}';
+    $descriptorsJson = $mode === 'levels' ? json_encode([$unit->id => $descriptors], JSON_UNESCAPED_UNICODE) : '{}';
 @endphp
 <x-layouts.app :title="$title" hide-term>
     <x-slot:breadcrumbs>
@@ -67,7 +67,7 @@
                     data-done="{{ $score === null ? 0 : 1 }}" data-done-by="cell">
                     <span class="w-7 text-right text-sm font-semibold tabular-nums text-ink-muted">{{ $s->list_number }}</span>
                     <span class="min-w-0 flex-1 text-base font-medium">{{ $s->name }}</span>
-                    <x-score :kind="$kind" :id="$unit->id" :term="$kind === 'subject' ? $term : null" :student="$s" :unit="$title" :value="$score" class="min-h-14 min-w-20 text-xl" />
+                    <x-score :kind="$kind" :id="$unit->id" :term="in_array($kind, ['subject', 'skill'], true) ? $term : null" :student="$s" :unit="$title" :value="$score" class="min-h-14 min-w-20 text-xl" />
                 </li>
             @endforeach
             <li class="p-6 text-center text-ink-muted" data-search-empty hidden>Ningún alumno coincide.</li>

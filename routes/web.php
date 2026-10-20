@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function () {
         // Captura alumno por alumno (teclado) + guardado de una celda
         Route::get('capturar/aspecto/{termAspect}', [CaptureController::class, 'aspect'])->name('capture.aspect');
         Route::get('capturar/materia/{subject}', [CaptureController::class, 'subject'])->name('capture.subject');
+        Route::get('capturar/habilidad/{skill}', [CaptureController::class, 'skill'])->name('capture.skill');
         Route::get('proyectos/{project}/productos/{product}/criterios/{criterion}', [CaptureController::class, 'criterion'])->name('capture.criterion');
         Route::put('calificar', ScoreController::class)->name('score.update');
 

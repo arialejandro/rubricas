@@ -100,6 +100,7 @@ class ExcelExporter
         $first = $this->header($sheet, Campos::name($campo).' · Trimestre '.$this->book->term);
         $aspects = $this->book->aspectsFor($campo);
         $subjects = $this->book->subjectsFor($campo);
+        $skills = $this->book->skillsFor($campo);
 
         if ($aspects->isEmpty()) {
             $sheet->setCellValue("A{$first}", 'Este campo no tiene aspectos definidos en el trimestre.');
@@ -109,7 +110,14 @@ class ExcelExporter
 
         $cols = ['N.L.', 'Alumno'];
         foreach ($aspects as $a) {
-            $cols[] = $a->name.' ('.TermBook::fmt($a->weight).'%)'.($a->isFromProjects() ? ' · proyectos' : '');
+            $cols[] = $a->name.' ('.TermBook::fmt($a->weight).'%)'.match ($a->type) {
+                'projects' => ' · proyectos',
+                'skills' => ' · habilidades',
+                default => '',
+            };
+        }
+        foreach ($skills as $k) {
+            $cols[] = $k->name.' (habilidad)';
         }
         $cols[] = 'Base del campo';
         foreach ($subjects as $sub) {
@@ -135,6 +143,10 @@ class ExcelExporter
             foreach ($aspects as $a) {
                 $v = $this->book->aspectValue($a, $s);
                 $this->levelValue($sheet, $col++, $r, $v, $v !== null);
+            }
+            foreach ($skills as $k) {
+                $v = $this->book->skillScore($s->id, $k->id);
+                $this->levelValue($sheet, $col++, $r, $v === null ? null : (float) $v, $v !== null);
             }
             $this->levelValue($sheet, $col++, $r, $this->book->campoBase($campo, $s), true);
             foreach ($subjects as $sub) {
@@ -262,6 +274,15 @@ class ExcelExporter
                 }
             }
         }
+        foreach (Campos::SKILL_CAMPOS as $campo) {
+            foreach ($this->book->skillsFor($campo) as $k) {
+                $sheet->fromArray([
+                    'Habilidad prioritaria', $k->name, Campos::name($campo), 'Niveles', $k->name,
+                    ...array_map(fn ($lvl) => $k->{Level::column($lvl)}, array_keys(Level::LEVELS)),
+                ], null, "A{$r}");
+                $r++;
+            }
+        }
         foreach (['A' => 26, 'B' => 24, 'C' => 22, 'D' => 16, 'E' => 34, 'F' => 34, 'G' => 34, 'H' => 34, 'I' => 34] as $c => $w) {
             $sheet->getColumnDimension($c)->setWidth($w);
         }
@@ -285,9 +306,14 @@ class ExcelExporter
                         }
                     }
                 }
-                foreach ($this->book->aspectsFor($campo)->reject->isFromProjects() as $a) {
+                foreach ($this->book->directAspectsFor($campo) as $a) {
                     if ($this->book->aspectScore($s->id, $a->id) === null) {
                         $rows[] = [Campos::short($campo), 'Aspecto', $a->name, $s->list_number, $s->name];
+                    }
+                }
+                foreach ($this->book->skillsFor($campo) as $k) {
+                    if ($this->book->skillScore($s->id, $k->id) === null) {
+                        $rows[] = [Campos::short($campo), 'Habilidad', $k->name, $s->list_number, $s->name];
                     }
                 }
                 foreach ($this->book->subjectsFor($campo) as $sub) {

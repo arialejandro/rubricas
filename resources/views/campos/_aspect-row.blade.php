@@ -9,11 +9,12 @@
         <button type="button" class="btn btn-ghost btn-icon shrink-0 text-ink-muted hover:text-danger" aria-label="Quitar aspecto"
                 title="{{ ! empty($row['graded']) ? 'Tiene '.$row['graded'].' calificaciones' : 'Quitar' }}" data-repeater-remove><x-icon name="x" /></button>
     </div>
-    <div class="mt-2 flex gap-2" role="radiogroup" aria-label="Cómo se califica">
+    <div class="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Cómo se califica">
         @foreach (\App\Models\TermAspect::TYPES as $value => $label)
-            <label class="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-line px-3 text-sm font-semibold text-ink-muted has-checked:border-primary has-checked:bg-primary-soft has-checked:text-primary">
+            @continue($value === 'skills' && ! \App\Support\Campos::hasSkills($campo))
+            <label class="flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-line px-3 text-sm font-semibold text-ink-muted has-checked:border-primary has-checked:bg-primary-soft has-checked:text-primary">
                 <input type="radio" class="sr-only" name="aspects[{{ $i }}][type]" value="{{ $value }}" @checked(($row['type'] ?? 'direct') === $value)>
-                <x-icon :name="$value === 'projects' ? 'folder' : 'pencil'" class="size-4" /> {{ $label }}
+                <x-icon :name="['projects' => 'folder', 'direct' => 'pencil', 'skills' => 'clipboard'][$value]" class="size-4" /> {{ $label }}
             </label>
         @endforeach
     </div>
