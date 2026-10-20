@@ -8,6 +8,9 @@
     $subjectRows = old('subjects', $subjects->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->all());
     $skillRows = old('skills', $skills->map(fn ($k) => [
         'id' => $k->id, 'name' => $k->name, 'graded' => $k->scores_count,
+        'measure_unit' => $k->measure_unit, 'lower_is_better' => $k->lower_is_better,
+        'min_7' => $k->min_7, 'min_8' => $k->min_8, 'min_9' => $k->min_9, 'min_10' => $k->min_10,
+        'level_labels' => $k->level_labels ?? [],
         'level_logrado' => $k->level_logrado, 'level_satisfactorio' => $k->level_satisfactorio,
         'level_proceso' => $k->level_proceso, 'level_apoyo' => $k->level_apoyo,
     ])->all());
@@ -75,6 +78,9 @@
                         @endforeach
                     </div>
                     <template>@include('campos._skill-row', ['i' => '__INDEX__', 'row' => []])</template>
+                    <datalist id="measure-units">
+                        <option value="palabras por minuto"><option value="aciertos"><option value="errores"><option value="operaciones correctas"><option value="segundos">
+                    </datalist>
                     <button type="button" class="btn btn-ghost" data-repeater-add><x-icon name="plus" class="size-4" /> Agregar habilidad</button>
                 </section>
             @endif

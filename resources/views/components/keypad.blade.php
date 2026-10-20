@@ -35,11 +35,30 @@
                         class="{{ $span }} flex min-h-14 flex-col items-start justify-center rounded-2xl border-2 px-3 py-2 text-left transition active:scale-[.97] aria-pressed:ring-4 aria-pressed:ring-primary-soft"
                         style="border-color: color-mix(in srgb, var(--lvl) 45%, transparent); background: var(--lvl-soft); color: var(--lvl)">
                     <span class="flex w-full items-baseline justify-between gap-2 font-bold">
-                        <span>{{ \App\Support\Level::label($lvl) }}</span><span class="tabular-nums text-xl">{{ $n }}</span>
+                        <span data-pad-label="{{ $lvl }}">{{ \App\Support\Level::label($lvl) }}</span><span class="tabular-nums text-xl">{{ $n }}</span>
                     </span>
                     <span class="line-clamp-2 text-xs font-medium text-ink-muted" data-pad-descriptor="{{ $lvl }}"></span>
                 </button>
             @endforeach
+        </div>
+
+        {{-- Medición (habilidad medible): se teclea el número y el nivel se calcula en vivo --}}
+        <div data-pad-measure hidden>
+            <div class="mb-2 rounded-2xl border-2 border-line p-3 text-center transition" data-measure-preview
+                 style="border-color: color-mix(in srgb, var(--lvl, var(--line)) 55%, transparent); background: var(--lvl-soft, transparent)">
+                <div class="text-4xl font-bold tabular-nums leading-none" data-measure-display>—</div>
+                <div class="mt-1 text-xs text-ink-muted" data-measure-unit></div>
+                <div class="mt-1 text-sm font-bold" style="color: var(--lvl, var(--ink-muted))" data-measure-result>Escribe la medición</div>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                @foreach ([1, 2, 3, 4, 5, 6, 7, 8, 9] as $n)
+                    <button type="button" class="key min-h-12" data-digit="{{ $n }}">{{ $n }}</button>
+                @endforeach
+                <button type="button" class="key min-h-12" data-digit=".">.</button>
+                <button type="button" class="key min-h-12" data-digit="0">0</button>
+                <button type="button" class="key min-h-12 text-ink-muted" data-measure-back aria-label="Borrar último dígito"><x-icon name="backspace" class="size-6" /></button>
+            </div>
+            <button type="button" class="btn btn-primary mt-2 w-full" data-measure-ok>Guardar y siguiente</button>
         </div>
 
         <form class="space-y-2" data-pad-decimal-form hidden>

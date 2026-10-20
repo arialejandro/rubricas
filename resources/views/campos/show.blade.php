@@ -158,7 +158,7 @@
         <x-search class="mb-3" pending-toggle="Solo pendientes" />
 
         <section class="card overflow-x-auto" data-score-url="{{ route('score.update', $group) }}" data-advance="column"
-                 data-descriptors="{{ json_encode($skills->mapWithKeys(fn ($k) => [$k->id => $k->descriptors()]), JSON_UNESCAPED_UNICODE) }}">
+                 data-descriptors="{{ json_encode($skills->mapWithKeys(fn ($k) => [$k->id => $k->keypadConfig()]), JSON_UNESCAPED_UNICODE) }}">
             <table class="w-full border-collapse text-sm">
                 <thead>
                     <tr class="border-b border-line text-left text-ink-muted">
@@ -208,7 +208,8 @@
                                 </td>
                             @endforeach
                             @foreach ($skills as $skill)
-                                <td class="bg-primary-soft/40 px-2 py-1.5 text-center"><x-score kind="skill" :id="$skill->id" :term="$book->term" :student="$s" :unit="$skill->name" :value="$book->skillScore($s->id, $skill->id)" /></td>
+                                <td class="bg-primary-soft/40 px-2 py-1.5 text-center"><x-score kind="skill" :id="$skill->id" :term="$book->term" :student="$s" :unit="$skill->name" :value="$book->skillScore($s->id, $skill->id)"
+                                    :mode="$skill->isMeasured() ? 'measure' : null" :measure="$book->skillMeasure($s->id, $skill->id)" /></td>
                             @endforeach
                             @if ($subjects->isNotEmpty())
                                 <td class="lvl-text px-2 text-center font-semibold tabular-nums" data-paint="base:{{ $campo }}:{{ $s->id }}" @if ($base !== null) data-level="{{ Level::of($base) }}" @endif>{{ TermBook::fmt($base) }}</td>

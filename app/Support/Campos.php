@@ -30,6 +30,24 @@ final class Campos
         'saberes' => ['Cálculo mental', 'Resolución de problemas'],
     ];
 
+    /** Nombres de nivel de los estándares de lectura (en vez de Logrado/Satisfactorio…). */
+    public const STANDARD_LABELS = [
+        'logrado' => 'Avanzado',
+        'satisfactorio' => 'Estándar',
+        'proceso' => 'Se acerca al estándar',
+        'apoyo' => 'Requiere apoyo',
+    ];
+
+    /** Velocidad lectora: <85 = 6 · 85–99 = 7/8 · 100–114 = 9 · 115+ = 10 (ajustable por la maestra). */
+    public const READING_SPEED_DEFAULTS = [
+        'measure_unit' => 'palabras por minuto',
+        'lower_is_better' => false,
+        'min_7' => 85,
+        'min_8' => 92,
+        'min_9' => 100,
+        'min_10' => 115,
+    ];
+
     /** Estrategia sugerida al configurar un campo por primera vez en un trimestre. */
     public const DEFAULT_ASPECTS = [
         ['name' => 'Proyectos', 'type' => 'projects', 'weight' => 50],

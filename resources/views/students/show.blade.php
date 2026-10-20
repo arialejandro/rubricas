@@ -35,7 +35,7 @@
                     $complete = $book->campoComplete($campo, $s);
                 @endphp
                 <section class="card overflow-hidden" style="--c: {{ Campos::color($campo) }}" data-score-url="{{ route('score.update', $group) }}"
-                         data-descriptors="{{ json_encode($book->skillsFor($campo)->mapWithKeys(fn ($k) => [$k->id => $k->descriptors()]), JSON_UNESCAPED_UNICODE) }}">
+                         data-descriptors="{{ json_encode($book->skillsFor($campo)->mapWithKeys(fn ($k) => [$k->id => $k->keypadConfig()]), JSON_UNESCAPED_UNICODE) }}">
                     <div class="flex items-start justify-between gap-3 border-b border-line p-4">
                         <div>
                             <x-campo-chip :campo="$campo" />
@@ -80,7 +80,8 @@
                             @foreach ($book->skillsFor($campo) as $skill)
                                 <li class="flex min-h-14 items-center gap-3 bg-primary-soft/30 py-2 pr-4 pl-8">
                                     <span class="flex-1 font-medium">{{ $skill->name }} <span class="text-xs text-ink-muted">habilidad</span></span>
-                                    <x-score kind="skill" :id="$skill->id" :term="$book->term" :student="$s" :unit="$skill->name" :value="$book->skillScore($s->id, $skill->id)" />
+                                    <x-score kind="skill" :id="$skill->id" :term="$book->term" :student="$s" :unit="$skill->name" :value="$book->skillScore($s->id, $skill->id)"
+                                        :mode="$skill->isMeasured() ? 'measure' : null" :measure="$book->skillMeasure($s->id, $skill->id)" />
                                 </li>
                             @endforeach
                             @foreach ($book->subjectsFor($campo) as $sub)

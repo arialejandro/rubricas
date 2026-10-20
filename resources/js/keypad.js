@@ -19,10 +19,12 @@ import { showToast, fmt, levelOf, LEVEL_LABELS } from './ui';
 const pad = document.getElementById('keypad');
 const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
 const desktop = matchMedia('(min-width: 768px)');
-const failed = new Map(); // celda → valor pendiente de reintentar
+const failed = new Map(); // celda → { value, measure } pendiente de reintentar
 let current = null;
 let digitBuffer = '';
 let digitTimer;
+let measureBuffer = ''; // lo que se va tecleando en modo medición
+let config = {}; // de la celda abierta: descriptors, labels, unit, lower, thresholds
 
 export function initKeypad() {
     if (!pad) return;
@@ -44,6 +46,9 @@ export function initKeypad() {
     window.addEventListener('resize', follow);
 
     pad.querySelectorAll('[data-key]').forEach((key) => key.addEventListener('click', () => commit(key.dataset.key)));
+    pad.querySelectorAll('[data-digit]').forEach((key) => key.addEventListener('click', () => typeMeasure(key.dataset.digit)));
+    pad.querySelector('[data-measure-back]').addEventListener('click', () => typeMeasure('back'));
+    pad.querySelector('[data-measure-ok]').addEventListener('click', commitMeasure);
     pad.querySelector('[data-pad-clear]').addEventListener('click', () => commit(''));
     pad.querySelector('[data-pad-skip]').addEventListener('click', () => move(1));
     pad.querySelector('[data-pad-prev]').addEventListener('click', () => move(-1));
@@ -70,6 +75,25 @@ export function initKeypad() {
         if (!current || pad.hidden || e.target.closest('[data-pad-decimal-form]')) return;
         if (e.target.matches('input, textarea') && !pad.contains(e.target)) return;
 
+        // Modo medición: los dígitos arman el número; Retroceso borra un dígito; Enter guarda.
+        if (current.dataset.mode === 'measure') {
+            if (/^[0-9.]$/.test(e.key) || e.key === ',') {
+                e.preventDefault();
+                typeMeasure(e.key === ',' ? '.' : e.key);
+                return;
+            }
+            if (e.key === 'Backspace') {
+                e.preventDefault();
+                typeMeasure('back');
+                return;
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                commitMeasure();
+                return;
+            }
+        }
+
         if (/^[0-9]$/.test(e.key)) {
             e.preventDefault();
             typeDigit(e.key);
@@ -90,7 +114,7 @@ export function initKeypad() {
         }
     });
 
-    window.addEventListener('online', () => failed.forEach((value, cell) => save(cell, value)));
+    window.addEventListener('online', () => failed.forEach(({ value, measure }, cell) => save(cell, value, measure)));
     window.addEventListener('beforeunload', (e) => {
         if (failed.size > 0 || document.querySelector('[data-score-cell].is-saving')) e.preventDefault();
     });
@@ -122,17 +146,28 @@ export function open(cell) {
     current = cell;
     cell.classList.add('is-active');
 
-    const levels = cell.dataset.mode === 'levels';
+    const mode = cell.dataset.mode;
+    config = readConfig(cell);
+    const label = (v) => (config.labels ?? {})[levelOf(v)] ?? LEVEL_LABELS[levelOf(v)];
     pad.querySelector('[data-pad-student]').textContent = cell.dataset.studentName;
     pad.querySelector('[data-pad-unit]').textContent = cell.dataset.unitName;
     pad.querySelector('[data-pad-current]').textContent =
-        cell.dataset.value === '' ? 'Sin calificar' : `Actual: ${fmt(cell.dataset.value)}${levels ? ' · ' + LEVEL_LABELS[levelOf(cell.dataset.value)] : ''}`;
+        cell.dataset.value === ''
+            ? 'Sin calificar'
+            : mode === 'measure'
+              ? `Actual: ${fmt(cell.dataset.measure || cell.dataset.value)} → ${fmt(cell.dataset.value)}`
+              : `Actual: ${fmt(cell.dataset.value)}${mode === 'levels' ? ' · ' + label(cell.dataset.value) : ''}`;
     pad.querySelectorAll('[data-key]').forEach((k) => k.setAttribute('aria-pressed', String(k.dataset.key === cell.dataset.value)));
 
-    pad.querySelector('[data-pad-levels]').hidden = !levels;
-    pad.querySelector('[data-pad-grid]').hidden = levels;
+    pad.querySelector('[data-pad-levels]').hidden = mode !== 'levels';
+    pad.querySelector('[data-pad-measure]').hidden = mode !== 'measure';
+    pad.querySelector('[data-pad-grid]').hidden = mode !== 'score';
     pad.querySelector('[data-pad-decimal-form]').hidden = true;
-    if (levels) fillDescriptors(cell);
+    if (mode === 'levels') fillDescriptors();
+    if (mode === 'measure') {
+        measureBuffer = cell.dataset.measure || '';
+        renderMeasure();
+    }
 
     if (pad.hidden) {
         pad.hidden = false;
@@ -147,20 +182,75 @@ export function open(cell) {
     place();
 }
 
-/** Descriptores de la rúbrica del criterio debajo de cada nivel. */
-function fillDescriptors(cell) {
-    const container = cell.closest('[data-score-url]');
+/**
+ * Configuración de la celda desde data-descriptors del contenedor (por id):
+ * criterio → { nivel: descriptor }; habilidad → { descriptors, labels, unit, lower, thresholds }.
+ */
+function readConfig(cell) {
     let map = {};
     try {
-        map = JSON.parse(container.dataset.descriptors || '{}');
+        map = JSON.parse(cell.closest('[data-score-url]').dataset.descriptors || '{}');
     } catch (e) {
         map = {};
     }
-    const d = map[cell.dataset.id] || {};
+    const raw = map[cell.dataset.id] || {};
+    return raw.descriptors || raw.labels || raw.thresholds ? raw : { descriptors: raw };
+}
+
+/** Descriptor (y nombre propio, si lo hay) debajo de cada nivel. */
+function fillDescriptors() {
+    const d = config.descriptors || {};
     pad.querySelectorAll('[data-pad-descriptor]').forEach((el) => {
         el.textContent = d[el.dataset.padDescriptor] || '';
         el.hidden = !el.textContent;
     });
+    pad.querySelectorAll('[data-pad-label]').forEach((el) => {
+        el.textContent = (config.labels ?? {})[el.dataset.padLabel] ?? LEVEL_LABELS[el.dataset.padLabel];
+    });
+}
+
+/** Calificación que corresponde a una medición (misma regla que Skill::scoreFor). */
+function scoreForMeasure(n) {
+    const t = config.thresholds || {};
+    for (const score of ['10', '9', '8', '7']) {
+        const limit = t[score];
+        if (limit !== null && limit !== undefined && (config.lower ? n <= limit : n >= limit)) return Number(score);
+    }
+    return 6;
+}
+
+function typeMeasure(key) {
+    if (key === 'back') {
+        measureBuffer = measureBuffer.slice(0, -1);
+    } else if (key === '.') {
+        if (!measureBuffer.includes('.')) measureBuffer = (measureBuffer || '0') + '.';
+    } else if (measureBuffer.replace('.', '').length < 6) {
+        measureBuffer = measureBuffer === '0' ? key : measureBuffer + key;
+    }
+    renderMeasure();
+}
+
+function renderMeasure() {
+    const preview = pad.querySelector('[data-measure-preview]');
+    const n = Number(measureBuffer);
+    pad.querySelector('[data-measure-display]').textContent = measureBuffer === '' ? '—' : measureBuffer;
+    pad.querySelector('[data-measure-unit]').textContent = config.unit || '';
+    pad.querySelector('[data-measure-ok]').disabled = measureBuffer === '' || isNaN(n);
+    if (measureBuffer === '' || isNaN(n)) {
+        preview.removeAttribute('data-level');
+        pad.querySelector('[data-measure-result]').textContent = 'Escribe la medición';
+        return;
+    }
+    const score = scoreForMeasure(n);
+    const lvl = levelOf(score);
+    preview.dataset.level = lvl;
+    pad.querySelector('[data-measure-result]').textContent = `${score} · ${(config.labels ?? {})[lvl] ?? LEVEL_LABELS[lvl]}`;
+}
+
+function commitMeasure() {
+    if (!current || measureBuffer === '' || isNaN(Number(measureBuffer))) return;
+    const measure = String(Number(measureBuffer));
+    commit(String(scoreForMeasure(Number(measure))), measure);
 }
 
 export function close() {
@@ -233,18 +323,25 @@ function move(step) {
     next ? open(next) : close();
 }
 
-function commit(value) {
+/** measure: solo en habilidades medibles (el servidor recalcula la calificación con sus rangos). */
+function commit(value, measure = null) {
     if (!current) return;
     const cell = current;
-    setCell(cell, value, 'is-saving');
+    setCell(cell, value, 'is-saving', measure);
     move(1);
-    save(cell, value);
+    save(cell, value, measure);
 }
 
-function setCell(cell, value, state = null) {
+function setCell(cell, value, state = null, measure = null) {
     cell.dataset.value = value === null ? '' : String(value);
     const empty = cell.dataset.value === '';
-    cell.textContent = empty ? '—' : fmt(cell.dataset.value);
+    if (cell.dataset.mode === 'measure') {
+        cell.dataset.measure = empty || measure === null ? '' : String(measure);
+        cell.textContent = empty ? '—' : fmt(cell.dataset.measure || cell.dataset.value);
+        cell.title = empty ? '' : `Calificación ${fmt(cell.dataset.value)}`;
+    } else {
+        cell.textContent = empty ? '—' : fmt(cell.dataset.value);
+    }
     cell.toggleAttribute('data-empty', empty);
     empty ? cell.removeAttribute('data-level') : (cell.dataset.level = levelOf(cell.dataset.value));
     cell.classList.remove('is-saving', 'is-error');
@@ -253,8 +350,9 @@ function setCell(cell, value, state = null) {
     if (row && row.dataset.doneBy === 'cell') row.dataset.done = empty ? '0' : '1';
 }
 
-async function save(cell, value) {
+async function save(cell, value, measure = null) {
     const container = cell.closest('[data-score-url]');
+    const measured = cell.dataset.mode === 'measure';
     try {
         const res = await fetch(container.dataset.scoreUrl, {
             method: 'PUT',
@@ -264,7 +362,8 @@ async function save(cell, value) {
                 id: cell.dataset.id,
                 term: cell.dataset.term,
                 student_id: cell.dataset.student,
-                score: value,
+                // Medible: se manda la medición (vacía = borrar); el servidor calcula la calificación.
+                ...(measured ? { measure: value === '' ? '' : measure } : { score: value }),
             }),
         });
         const data = await res.json().catch(() => ({}));
@@ -272,10 +371,10 @@ async function save(cell, value) {
         if (!res.ok) throw new Error(Object.values(data.errors ?? {})[0]?.[0] ?? data.message ?? 'No se pudo guardar');
 
         failed.delete(cell);
-        setCell(cell, data.score);
+        setCell(cell, data.score, null, data.measure ?? null);
         paint(data.paint);
     } catch (e) {
-        failed.set(cell, value);
+        failed.set(cell, { value, measure });
         cell.classList.remove('is-saving');
         cell.classList.add('is-error');
         showToast(e instanceof TypeError ? 'Sin conexión: se guardará al volver la red.' : e.message);

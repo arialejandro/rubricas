@@ -94,15 +94,18 @@ class CaptureController extends Controller
 
         return view('capture', [
             ...$this->campoContext($group, $book, $skill->campo, "skill:{$skill->id}"),
-            'mode' => 'levels',
+            'mode' => $skill->isMeasured() ? 'measure' : 'levels',
             'kind' => 'skill',
             'unit' => $skill,
             'unitKey' => "skill:{$skill->id}",
             'title' => $skill->name,
-            'subtitle' => Campos::short($skill->campo).' · habilidad prioritaria',
+            'subtitle' => Campos::short($skill->campo).' · '.($skill->isMeasured() ? 'se mide en '.$skill->measure_unit : 'habilidad prioritaria'),
             'missing' => $book->skillMissing($skill),
             'value' => fn ($s) => $book->skillScore($s->id, $skill->id),
+            'measure' => fn ($s) => $book->skillMeasure($s->id, $skill->id),
             'descriptors' => $skill->descriptors(),
+            'labels' => $skill->labels(),
+            'keypad' => $skill->keypadConfig(),
             'term' => $book->term,
         ]);
     }

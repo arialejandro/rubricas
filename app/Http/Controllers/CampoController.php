@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Group;
+use App\Models\Skill;
 use App\Models\TermAspect;
 use App\Support\Campos;
 use App\Support\Level;
@@ -59,7 +60,26 @@ class CampoController extends Controller
         $request->merge(['aspects' => $aspects, 'subjects' => $subjects, 'skills' => $skills]);
 
         $types = Campos::hasSkills($campo) ? array_keys(TermAspect::TYPES) : ['projects', 'direct'];
-        $levelRules = collect(array_keys(Level::LEVELS))->mapWithKeys(fn ($l) => ['skills.*.'.Level::column($l) => ['nullable', 'string', 'max:1000']])->all();
+        $levelRules = collect(array_keys(Level::LEVELS))->flatMap(fn ($l) => [
+            'skills.*.'.Level::column($l) => ['nullable', 'string', 'max:1000'],
+            "skills.*.level_labels.{$l}" => ['nullable', 'string', 'max:40'],
+        ])->merge(collect(array_keys(Skill::THRESHOLDS))->mapWithKeys(fn ($c) => ["skills.*.{$c}" => ['nullable', 'numeric', 'min:0', 'max:99999']]))
+            ->merge([
+                'skills.*.measure_unit' => ['nullable', 'string', 'max:40'],
+                'skills.*.lower_is_better' => ['nullable', 'boolean'],
+                'skills.*.mode' => ['nullable', Rule::in(['level', 'measure'])],
+            ])
+            ->all();
+        // Coma decimal en los rangos.
+        $request->merge(['skills' => collect($request->input('skills', []))->map(function ($k) {
+            foreach (array_keys(Skill::THRESHOLDS) as $c) {
+                if (isset($k[$c])) {
+                    $k[$c] = str_replace(',', '.', trim((string) $k[$c]));
+                }
+            }
+
+            return $k;
+        })->all()]);
 
         $data = $request->validate([
             'aspects' => ['required', 'array', 'min:1', 'max:'.Campos::MAX_ASPECTS],
@@ -91,6 +111,7 @@ class CampoController extends Controller
         if (collect($data['aspects'])->where('type', 'skills')->count() > 1) {
             throw ValidationException::withMessages(['aspects' => 'Solo un aspecto puede tomar su calificación de las habilidades prioritarias.']);
         }
+        $data['skills'] = collect($data['skills'] ?? [])->map(fn ($k) => $this->normalizeSkill($k))->all();
 
         $aspectQuery = $group->termAspects()->where('term', $term)->where('campo', $campo);
         $removedAspects = (clone $aspectQuery)->whereNotIn('id', collect($data['aspects'])->pluck('id')->filter())->withCount('scores')->get();
@@ -119,7 +140,13 @@ class CampoController extends Controller
             foreach ($data['skills'] ?? [] as $i => $k) {
                 $attrs = [...collect($k)->except('id')->all(), 'position' => $i];
                 $existing = ! empty($k['id']) ? (clone $skillQuery)->find($k['id']) : null;
-                $existing ? $existing->update($attrs) : $group->skills()->create([...$attrs, 'campo' => $campo]);
+                $skill = $existing ? tap($existing)->update($attrs) : $group->skills()->create([...$attrs, 'campo' => $campo]);
+
+                // Si cambiaron los rangos, las mediciones ya capturadas se vuelven a calificar.
+                if ($skill->isMeasured()) {
+                    $skill->scores()->whereNotNull('measure')->get()
+                        ->each(fn ($s) => $s->update(['score' => $skill->scoreFor($s->measure)]));
+                }
             }
 
             foreach ($data['aspects'] as $i => $a) {
@@ -139,6 +166,41 @@ class CampoController extends Controller
         });
 
         return redirect()->route('campos.show', [$group, $campo])->with('status', Campos::short($campo).': evaluación del trimestre guardada.');
+    }
+
+    /**
+     * Habilidad medible: unidad + los 4 cortes completos y en orden (de menor a mayor, o al revés
+     * si "menos es mejor"). Sin unidad, la habilidad se califica eligiendo el nivel.
+     */
+    private function normalizeSkill(array $k): array
+    {
+        $labels = collect($k['level_labels'] ?? [])->map(fn ($v) => trim((string) $v))->filter()->all();
+        $k['level_labels'] = $labels ?: null;
+        $k['measure_unit'] = trim((string) ($k['measure_unit'] ?? '')) ?: null;
+        $k['lower_is_better'] = (bool) ($k['lower_is_better'] ?? false);
+        $mode = $k['mode'] ?? null;
+        unset($k['mode']);
+
+        if ($mode === 'measure' && $k['measure_unit'] === null) {
+            throw ValidationException::withMessages(['skills' => "{$k['name']}: escribe qué se mide (ej. palabras por minuto)."]);
+        }
+        if ($mode === 'level' || $k['measure_unit'] === null) {
+            $k['measure_unit'] = null;
+            return [...$k, 'min_7' => null, 'min_8' => null, 'min_9' => null, 'min_10' => null, 'lower_is_better' => false];
+        }
+
+        $cuts = array_map(fn ($c) => $k[$c] ?? null, ['min_7', 'min_8', 'min_9', 'min_10']);
+        if (in_array(null, $cuts, true) || in_array('', $cuts, true)) {
+            throw ValidationException::withMessages(['skills' => "{$k['name']}: para calcular el nivel con la medición, llena los cuatro rangos (desde cuánto vale 7, 8, 9 y 10)."]);
+        }
+        $cuts = array_map('floatval', $cuts);
+        $sorted = $cuts;
+        $k['lower_is_better'] ? rsort($sorted) : sort($sorted);
+        if ($sorted !== $cuts || count(array_unique($cuts)) !== 4) {
+            throw ValidationException::withMessages(['skills' => "{$k['name']}: los rangos deben ir ".($k['lower_is_better'] ? 'de mayor a menor (menos es mejor)' : 'de menor a mayor').', sin repetirse.']);
+        }
+
+        return $k;
     }
 
     public function copyPrevious(Group $group, string $campo): RedirectResponse

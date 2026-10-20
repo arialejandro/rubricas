@@ -31,6 +31,23 @@ document.querySelectorAll('form[data-confirm]').forEach((form) => {
     });
 });
 
+// Habilidad: "Elijo el nivel" / "Mido y se calcula" (campos/_skill-row). Delegado: sirve para renglones nuevos.
+// En modo nivel los campos de medición se deshabilitan para que no se envíen (sin unidad = por nivel).
+const syncSkillRow = (row) => {
+    const measured = row.querySelector('[data-skill-mode]:checked')?.value === 'measure';
+    const box = row.querySelector('[data-skill-measure]');
+    box.hidden = !measured;
+    box.querySelectorAll('input').forEach((el) => (el.disabled = !measured));
+    const lower = row.querySelector('[data-skill-lower]')?.checked;
+    row.querySelectorAll('[data-skill-cut-word]').forEach((el) => (el.textContent = lower ? 'Hasta' : 'Desde'));
+    const hint = row.querySelector('[data-skill-cut-hint]');
+    if (hint) hint.textContent = lower ? '(hasta cuánto vale cada calificación)' : '(desde cuánto vale cada calificación)';
+};
+document.querySelectorAll('[data-skill-row]').forEach(syncSkillRow);
+document.addEventListener('change', (e) => {
+    if (e.target.matches('[data-skill-mode], [data-skill-lower]')) syncSkillRow(e.target.closest('[data-skill-row]'));
+});
+
 // Cargar lista con "Reemplazar lista": se confirma antes, porque borra a los alumnos actuales.
 document.querySelectorAll('form[data-replace-guard]').forEach((form) => {
     form.addEventListener('submit', (e) => {

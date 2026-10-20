@@ -1,13 +1,18 @@
 {{--
     Captura "punto de venta" (CaptureController): lista de alumnos + teclado.
-    mode "levels" = criterio de proyecto (niveles 6–10 con descriptores); "score" = 0–10.
+    mode "levels" = criterio/habilidad por nivel (6–10 con descriptores); "measure" = habilidad medible
+    (se captura la medición y el nivel se calcula); "score" = 0–10.
 --}}
 @use('App\Support\Campos')
 @use('App\Support\Level')
 @php
     $total = $book->students->count();
-    $kind = $kind;
-    $descriptorsJson = $mode === 'levels' ? json_encode([$unit->id => $descriptors], JSON_UNESCAPED_UNICODE) : '{}';
+    $labels = $labels ?? [];
+    $measure = $measure ?? null;
+    $descriptorsJson = json_encode(
+        $mode === 'score' ? [] : [$unit->id => $keypad ?? $descriptors],
+        JSON_UNESCAPED_UNICODE | JSON_FORCE_OBJECT,
+    );
 @endphp
 <x-layouts.app :title="$title" hide-term>
     <x-slot:breadcrumbs>
@@ -42,12 +47,12 @@
         @if ($descriptors)
             <details class="card group mb-4" open>
                 <summary class="flex min-h-12 list-none items-center gap-2 px-4 text-sm font-semibold">
-                    Rúbrica del criterio <x-icon name="chevron-right" class="ml-auto size-4 transition group-open:rotate-90" />
+                    {{ $mode === 'measure' ? 'Rangos de calificación' : ($kind === 'skill' ? 'Niveles de la habilidad' : 'Rúbrica del criterio') }} <x-icon name="chevron-right" class="ml-auto size-4 transition group-open:rotate-90" />
                 </summary>
                 <dl class="grid gap-2 border-t border-line p-3 sm:grid-cols-2">
                     @foreach ($descriptors as $lvl => $text)
                         <div class="rounded-xl p-3" data-level="{{ $lvl }}" style="background: var(--lvl-soft)">
-                            <dt class="text-sm font-bold" style="color: var(--lvl)">{{ Level::label($lvl) }} · {{ implode('/', Level::LEVELS[$lvl]['scores']) }}</dt>
+                            <dt class="text-sm font-bold" style="color: var(--lvl)">{{ $labels[$lvl] ?? Level::label($lvl) }} · {{ implode('/', Level::LEVELS[$lvl]['scores']) }}</dt>
                             <dd class="text-sm">{{ $text }}</dd>
                         </div>
                     @endforeach
@@ -67,7 +72,8 @@
                     data-done="{{ $score === null ? 0 : 1 }}" data-done-by="cell">
                     <span class="w-7 text-right text-sm font-semibold tabular-nums text-ink-muted">{{ $s->list_number }}</span>
                     <span class="min-w-0 flex-1 text-base font-medium">{{ $s->name }}</span>
-                    <x-score :kind="$kind" :id="$unit->id" :term="in_array($kind, ['subject', 'skill'], true) ? $term : null" :student="$s" :unit="$title" :value="$score" class="min-h-14 min-w-20 text-xl" />
+                    <x-score :kind="$kind" :id="$unit->id" :term="in_array($kind, ['subject', 'skill'], true) ? $term : null" :student="$s" :unit="$title" :value="$score"
+                                 :mode="$mode" :measure="$measure ? $measure($s) : null" class="min-h-14 min-w-20 text-xl" />
                 </li>
             @endforeach
             <li class="p-6 text-center text-ink-muted" data-search-empty hidden>Ningún alumno coincide.</li>

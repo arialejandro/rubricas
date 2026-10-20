@@ -45,6 +45,9 @@ class TermBook
     /** @var array<int, array<int, int>> [student][skill] */
     private array $skl = [];
 
+    /** @var array<int, array<int, float>> [student][skill] medición de habilidades medibles */
+    private array $skm = [];
+
     /** @var Collection<int, Skill> */
     public Collection $skills;
 
@@ -93,8 +96,13 @@ class TermBook
 
         $book->skills = $group->skills()->get();
         SkillScore::whereIn('skill_id', $book->skills->pluck('id'))->whereIn('student_id', $ids)->where('term', $term)
-            ->get(['skill_id', 'student_id', 'score'])
-            ->each(function ($r) use ($book) { $book->skl[$r->student_id][$r->skill_id] = $r->score; });
+            ->get(['skill_id', 'student_id', 'score', 'measure'])
+            ->each(function ($r) use ($book) {
+                $book->skl[$r->student_id][$r->skill_id] = $r->score;
+                if ($r->measure !== null) {
+                    $book->skm[$r->student_id][$r->skill_id] = $r->measure;
+                }
+            });
 
         return $book;
     }
@@ -186,6 +194,11 @@ class TermBook
     public function skillScore(int $studentId, int $skillId): ?int
     {
         return $this->skl[$studentId][$skillId] ?? null;
+    }
+
+    public function skillMeasure(int $studentId, int $skillId): ?float
+    {
+        return $this->skm[$studentId][$skillId] ?? null;
     }
 
     // ---------------------------------------------------------------- derivadas

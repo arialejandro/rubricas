@@ -28,7 +28,8 @@ class ScoreController extends Controller
     public function __invoke(Request $request, Group $group): JsonResponse
     {
         $raw = str_replace(',', '.', trim((string) $request->input('score', '')));
-        $request->merge(['score' => $raw === '' ? null : $raw]);
+        $rawMeasure = str_replace(',', '.', trim((string) $request->input('measure', '')));
+        $request->merge(['score' => $raw === '' ? null : $raw, 'measure' => $rawMeasure === '' ? null : $rawMeasure]);
 
         $data = $request->validate([
             'kind' => ['required', Rule::in(['criterion', 'aspect', 'subject', 'skill'])],
@@ -36,7 +37,9 @@ class ScoreController extends Controller
             'student_id' => ['required', 'integer', Rule::exists('students', 'id')->where('group_id', $group->id)->where('active', true)],
             'term' => ['nullable', 'integer', Rule::in(Campos::TERMS)],
             'score' => ['nullable', 'numeric', 'min:0', 'max:10', 'decimal:0,2'],
+            'measure' => ['nullable', 'numeric', 'min:0', 'max:99999', 'decimal:0,2'],
         ], [
+            'measure.numeric' => 'Escribe la medición con números.',
             'score.numeric' => 'Escribe un número del 0 al 10.',
             'score.max' => 'La calificación máxima es 10.',
             'score.decimal' => 'Máximo dos decimales.',
@@ -46,11 +49,20 @@ class ScoreController extends Controller
         $studentId = (int) $data['student_id'];
 
         [$term, $campo, $product, $unitKey, $model] = match ($data['kind']) {
-            'criterion' => $this->criterion($group, (int) $data['id'], $score),
+            'criterion' => $this->criterion($group, (int) $data['id']),
             'aspect' => $this->aspect($group, (int) $data['id']),
             'subject' => $this->subject($group, (int) $data['id'], $data['term'] ?? $group->term()),
-            'skill' => $this->skill($group, (int) $data['id'], $data['term'] ?? $group->term(), $score),
+            'skill' => $this->skill($group, (int) $data['id'], $data['term'] ?? $group->term()),
         };
+
+        // Habilidad medible: se guarda la medición y la calificación sale de los rangos de la maestra.
+        $measure = null;
+        if ($data['kind'] === 'skill' && $model->isMeasured()) {
+            $measure = $data['measure'] === null ? null : (float) $data['measure'];
+            $score = $measure === null ? null : (float) $model->scoreFor($measure);
+        } elseif (in_array($data['kind'], ['criterion', 'skill'], true)) {
+            $this->ensureLevel($score);
+        }
 
         $key = match ($data['kind']) {
             'criterion' => ['criterion_id' => $model->id, 'student_id' => $studentId],
@@ -65,9 +77,10 @@ class ScoreController extends Controller
             'skill' => SkillScore::class,
         };
 
+        $values = $data['kind'] === 'skill' ? ['score' => $score, 'measure' => $measure] : ['score' => $score];
         $score === null
             ? $class::where($key)->delete()
-            : $class::updateOrCreate($key, ['score' => $score]);
+            : $class::updateOrCreate($key, $values);
 
         $book = TermBook::for($group, $term);
         $student = $book->students->firstWhere('id', $studentId);
@@ -80,26 +93,24 @@ class ScoreController extends Controller
 
         return response()->json([
             'score' => $score,
+            'measure' => $measure,
             'level' => Level::of($score),
             'paint' => $book->paint($student, $campo, $product, $unitKey, $missing),
         ]);
     }
 
     /** @return array{0:int, 1:string, 2:\App\Models\Product, 3:string, 4:Criterion} */
-    private function criterion(Group $group, int $id, ?float $score): array
+    private function criterion(Group $group, int $id): array
     {
         $criterion = Criterion::with('product.project')->findOrFail($id);
         abort_unless($criterion->product->project->group_id === $group->id, 404);
 
-        $this->ensureLevel($score);
-
         return [$criterion->product->project->term, $criterion->product->campo, $criterion->product, "criterion:{$id}", $criterion];
     }
 
-    private function skill(Group $group, int $id, int $term, ?float $score): array
+    private function skill(Group $group, int $id, int $term): array
     {
         $skill = $group->skills()->findOrFail($id);
-        $this->ensureLevel($score);
 
         return [$term, $skill->campo, null, "skill:{$id}", $skill];
     }

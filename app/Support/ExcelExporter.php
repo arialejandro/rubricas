@@ -117,6 +117,9 @@ class ExcelExporter
             };
         }
         foreach ($skills as $k) {
+            if ($k->isMeasured()) {
+                $cols[] = $k->name.' ('.$k->measure_unit.')';
+            }
             $cols[] = $k->name.' (habilidad)';
         }
         $cols[] = 'Base del campo';
@@ -145,6 +148,13 @@ class ExcelExporter
                 $this->levelValue($sheet, $col++, $r, $v, $v !== null);
             }
             foreach ($skills as $k) {
+                if ($k->isMeasured()) {
+                    $measure = $this->book->skillMeasure($s->id, $k->id);
+                    $cell = Coordinate::stringFromColumnIndex($col++).$r;
+                    $measure === null
+                        ? $sheet->getStyle($cell)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB(self::MISSING_FILL)
+                        : $sheet->setCellValue($cell, $measure);
+                }
                 $v = $this->book->skillScore($s->id, $k->id);
                 $this->levelValue($sheet, $col++, $r, $v === null ? null : (float) $v, $v !== null);
             }
@@ -276,9 +286,10 @@ class ExcelExporter
         }
         foreach (Campos::SKILL_CAMPOS as $campo) {
             foreach ($this->book->skillsFor($campo) as $k) {
+                $d = $k->descriptors();
                 $sheet->fromArray([
-                    'Habilidad prioritaria', $k->name, Campos::name($campo), 'Niveles', $k->name,
-                    ...array_map(fn ($lvl) => $k->{Level::column($lvl)}, array_keys(Level::LEVELS)),
+                    'Habilidad prioritaria', $k->name, Campos::name($campo), $k->isMeasured() ? 'Medición: '.$k->measure_unit : 'Niveles', $k->name,
+                    ...array_map(fn ($lvl) => $k->levelLabel($lvl).(isset($d[$lvl]) ? ': '.$d[$lvl] : ''), array_keys(Level::LEVELS)),
                 ], null, "A{$r}");
                 $r++;
             }

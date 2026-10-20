@@ -135,6 +135,75 @@ class NemEvaluationTest extends TestCase
         $this->assertSame(4, $book->campoMissing('saberes', $this->bruno)); // 2 habilidades + examen + criterio de la bitácora
     }
 
+    public function test_measured_skill_scores_from_teacher_ranges(): void
+    {
+        $speed = $this->group->skills()->where('name', 'Velocidad lectora')->first();
+        $this->assertTrue($speed->isMeasured());
+        $this->assertSame('Avanzado', $speed->levelLabel('logrado'));
+
+        // <85 = 6 · 85–91 = 7 · 92–99 = 8 · 100–114 = 9 · 115+ = 10
+        foreach ([84 => 6, 85 => 7, 91 => 7, 92 => 8, 99 => 8, 100 => 9, 114 => 9, 115 => 10, 140 => 10] as $ppm => $score) {
+            $this->assertSame($score, $speed->scoreFor($ppm), "{$ppm} ppm");
+        }
+
+        $this->group->termAspects()->create(['term' => 1, 'campo' => 'lenguajes', 'name' => 'Habilidades', 'type' => 'skills', 'weight' => 10]);
+        $this->actingAs($this->teacher)->putJson(route('score.update', $this->group), [
+            'kind' => 'skill', 'id' => $speed->id, 'student_id' => $this->ana->id, 'term' => 1, 'measure' => '103',
+        ])->assertOk()->assertJsonPath('score', 9)->assertJsonPath('measure', 103)->assertJsonPath('level', 'satisfactorio');
+
+        $book = TermBook::for($this->group->fresh(), 1);
+        $this->assertSame(103.0, $book->skillMeasure($this->ana->id, $speed->id));
+        $this->assertSame(9, $book->skillScore($this->ana->id, $speed->id));
+
+        // La maestra ajusta los rangos: 103 ppm pasa a valer 10 sin recapturar.
+        $this->actingAs($this->teacher)->put(route('campos.update', [$this->group, 'lenguajes']), [
+            'aspects' => [
+                ['id' => $this->group->termAspects()->where('campo', 'lenguajes')->where('name', 'Proyectos')->value('id'), 'name' => 'Proyectos', 'type' => 'projects', 'weight' => '45'],
+                ['id' => $this->exam->id, 'name' => 'Examen', 'type' => 'direct', 'weight' => '45'],
+                ['id' => $this->group->termAspects()->where('name', 'Habilidades')->value('id'), 'name' => 'Habilidades', 'type' => 'skills', 'weight' => '10'],
+            ],
+            'subjects' => $this->group->subjects()->where('campo', 'lenguajes')->get(['id', 'name'])->toArray(),
+            'skills' => [[
+                'id' => $speed->id, 'name' => 'Velocidad lectora', 'mode' => 'measure', 'measure_unit' => 'palabras por minuto',
+                'min_7' => '80', 'min_8' => '88', 'min_9' => '95', 'min_10' => '102',
+                'level_labels' => ['logrado' => 'Avanzado', 'satisfactorio' => 'Estándar', 'proceso' => 'Se acerca al estándar', 'apoyo' => 'Requiere apoyo'],
+            ]],
+        ])->assertSessionHasNoErrors();
+        $this->assertSame(10, $speed->scores()->first()->score);
+    }
+
+    public function test_measured_skill_validation_and_lower_is_better(): void
+    {
+        $url = route('campos.update', [$this->group, 'saberes']);
+        $aspects = [['name' => 'Habilidades', 'type' => 'skills', 'weight' => '100']];
+
+        // Rangos fuera de orden.
+        $this->actingAs($this->teacher)->put($url, ['aspects' => $aspects, 'skills' => [[
+            'name' => 'Cálculo', 'mode' => 'measure', 'measure_unit' => 'aciertos', 'min_7' => '10', 'min_8' => '8', 'min_9' => '12', 'min_10' => '15',
+        ]]])->assertSessionHasErrors('skills');
+
+        // Falta qué se mide.
+        $this->actingAs($this->teacher)->put($url, ['aspects' => $aspects, 'skills' => [['name' => 'Cálculo', 'mode' => 'measure']]])
+            ->assertSessionHasErrors('skills');
+
+        // Errores: menos es mejor (rangos de mayor a menor).
+        $this->actingAs($this->teacher)->put($url, ['aspects' => $aspects, 'skills' => [[
+            'name' => 'Errores de cálculo', 'mode' => 'measure', 'measure_unit' => 'errores', 'lower_is_better' => '1',
+            'min_7' => '8', 'min_8' => '5', 'min_9' => '3', 'min_10' => '1',
+        ]]])->assertSessionHasNoErrors();
+
+        $skill = $this->group->skills()->where('name', 'Errores de cálculo')->first();
+        foreach ([0 => 10, 1 => 10, 2 => 9, 3 => 9, 5 => 8, 8 => 7, 9 => 6] as $errors => $score) {
+            $this->assertSame($score, $skill->scoreFor($errors), "{$errors} errores");
+        }
+
+        // "Elijo el nivel" borra la medición y vuelve a calificar por nivel.
+        $this->actingAs($this->teacher)->put($url, ['aspects' => $aspects, 'skills' => [[
+            'id' => $skill->id, 'name' => 'Errores de cálculo', 'mode' => 'level', 'measure_unit' => 'errores',
+        ]]])->assertSessionHasNoErrors();
+        $this->assertFalse($skill->fresh()->isMeasured());
+    }
+
     public function test_skills_aspect_only_in_lenguajes_and_saberes(): void
     {
         $payload = ['aspects' => [
