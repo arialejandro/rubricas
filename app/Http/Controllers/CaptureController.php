@@ -6,7 +6,6 @@ use App\Models\Criterion;
 use App\Models\Group;
 use App\Models\Product;
 use App\Models\Project;
-use App\Models\Skill;
 use App\Models\Subject;
 use App\Models\TermAspect;
 use App\Support\Campos;
@@ -87,37 +86,12 @@ class CaptureController extends Controller
         ]);
     }
 
-    /** Habilidad prioritaria: por nivel 6–10, con su descriptor si lo tiene. */
-    public function skill(Group $group, Skill $skill): View
-    {
-        $book = TermBook::for($group);
-
-        return view('capture', [
-            ...$this->campoContext($group, $book, $skill->campo, "skill:{$skill->id}"),
-            'mode' => $skill->isMeasured() ? 'measure' : 'levels',
-            'kind' => 'skill',
-            'unit' => $skill,
-            'unitKey' => "skill:{$skill->id}",
-            'title' => $skill->name,
-            'subtitle' => Campos::short($skill->campo).' · '.($skill->isMeasured() ? 'se mide en '.$skill->measure_unit : 'habilidad prioritaria'),
-            'missing' => $book->skillMissing($skill),
-            'value' => fn ($s) => $book->skillScore($s->id, $skill->id),
-            'measure' => fn ($s) => $book->skillMeasure($s->id, $skill->id),
-            'descriptors' => $skill->descriptors(),
-            'labels' => $skill->labels(),
-            'keypad' => $skill->keypadConfig(),
-            'term' => $book->term,
-        ]);
-    }
-
-    /** Pestañas para saltar entre lo capturable del campo (aspectos directos, habilidades y materias). */
+    /** Pestañas para saltar entre lo capturable del campo (aspectos directos y materias). */
     private function campoContext(Group $group, TermBook $book, string $campo, string $activeKey): array
     {
         $tabs = $book->directAspectsFor($campo)->map(fn ($a) => [
             'label' => $a->name, 'url' => route('capture.aspect', [$group, $a]), 'active' => $activeKey === "aspect:{$a->id}",
-        ])->merge($book->allSkillsFor($campo)->map(fn ($k) => [
-            'label' => $k->name, 'url' => route('capture.skill', [$group, $k]), 'active' => $activeKey === "skill:{$k->id}",
-        ]))->merge($book->subjectsFor($campo)->map(fn ($s) => [
+        ])->merge($book->subjectsFor($campo)->map(fn ($s) => [
             'label' => $s->name, 'url' => route('capture.subject', [$group, $s]), 'active' => $activeKey === "subject:{$s->id}",
         ]))->values();
 

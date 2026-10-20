@@ -37,7 +37,7 @@ class Group extends Model
             foreach (Campos::DEFAULT_SKILLS as $campo => $names) {
                 foreach ($names as $i => $name) {
                     $measured = $name === 'Velocidad lectora'
-                        ? Campos::READING_SPEED_DEFAULTS + ['level_labels' => Campos::STANDARD_LABELS]
+                        ? Campos::READING_SPEED_DEFAULTS + ['grading' => 'measure', 'level_labels' => Campos::STANDARD_LABELS]
                         : [];
                     $group->skills()->create(['campo' => $campo, 'name' => $name, 'position' => $i, ...$measured]);
                 }

@@ -116,10 +116,13 @@ class NemEvaluationTest extends TestCase
         $this->group->termAspects()->create(['term' => 1, 'campo' => 'saberes', 'name' => 'Habilidades prioritarias', 'type' => 'skills', 'weight' => 50, 'position' => 0]);
         [$calc, $problems] = $this->group->skills()->where('campo', 'saberes')->get()->all();
 
-        // Por nivel: 7.5 no es un nivel.
-        $this->score('skill', $calc->id, $this->ana, '7.5', 1)->assertUnprocessable();
-        $this->score('skill', $calc->id, $this->ana, '10', 1)->assertOk()->assertJsonPath('paint.text.skills:saberes:'.$this->ana->id, '10');
-        $this->score('skill', $problems->id, $this->ana, '8', 1)->assertOk()->assertJsonPath('paint.text.skills:saberes:'.$this->ana->id, '9');
+        $calcApp = $calc->applications()->create(['term' => 1]);
+        $problemsApp = $problems->applications()->create(['term' => 1]);
+
+        // Por nivel: 7.5 no es un nivel. La celda es la APLICACIÓN.
+        $this->score('skill', $calcApp->id, $this->ana, '7.5')->assertUnprocessable();
+        $this->score('skill', $calcApp->id, $this->ana, '10')->assertOk()->assertJsonPath('paint.text.skills:saberes:'.$this->ana->id, '10');
+        $this->score('skill', $problemsApp->id, $this->ana, '8')->assertOk()->assertJsonPath('paint.text.skills:saberes:'.$this->ana->id, '9');
         $this->score('aspect', $exam->id, $this->ana, '7')->assertOk();
         $bitacora = $this->project->products()->where('name', 'Bitácora')->first()->criteria()->first();
         $this->score('criterion', $bitacora->id, $this->ana, '9')->assertOk();
@@ -133,6 +136,70 @@ class NemEvaluationTest extends TestCase
         // Las habilidades solo cuentan si el campo tiene el aspecto: Lenguajes no lo tiene aquí.
         $this->assertCount(0, $book->skillsFor('lenguajes'));
         $this->assertSame(4, $book->campoMissing('saberes', $this->bruno)); // 2 habilidades + examen + criterio de la bitácora
+    }
+
+    public function test_repeated_skill_applications_average_and_track_progress(): void
+    {
+        $this->group->termAspects()->create(['term' => 1, 'campo' => 'saberes', 'name' => 'Habilidades', 'type' => 'skills', 'weight' => 100]);
+        $mult = $this->group->skills()->create(['campo' => 'saberes', 'name' => 'Multiplicación', 'grading' => 'level']);
+
+        // Tres aplicaciones en el trimestre (alta desde la pantalla de avance).
+        foreach (['2026-10-05', '2026-10-19', '2026-10-30'] as $date) {
+            $this->actingAs($this->teacher)->post(route('skills.applications.store', [$this->group, $mult]), ['applied_on' => $date])->assertRedirect();
+        }
+        $apps = $mult->applications()->get();
+        $this->assertCount(3, $apps);
+
+        foreach ([7, 8, 10] as $i => $score) {
+            $this->score('skill', $apps[$i]->id, $this->ana, (string) $score)->assertOk();
+        }
+
+        $book = TermBook::for($this->group->fresh(), 1);
+        $skill = $book->skills->firstWhere('id', $mult->id);
+        // Promedio de las aplicaciones = (7+8+10)/3 = 8.33 → es lo que cuenta para el campo.
+        $this->assertSame(8.33, $book->skillScore($this->ana->id, $mult->id));
+        $this->assertSame(3 * 1, $book->skillCells($skill));
+        $this->assertSame(0, $book->skillMissingFor($skill, $this->ana));
+        $this->assertSame(3, $book->skillMissingFor($skill, $this->bruno));
+
+        $this->actingAs($this->teacher)->get(route('skills.show', [$this->group, $mult]))
+            ->assertOk()->assertSee('Avance del grupo')->assertSee('+3', false);
+
+        // Borrar una aplicación quita sus calificaciones y recalcula.
+        $this->actingAs($this->teacher)->delete(route('skills.applications.destroy', [$this->group, $mult, $apps[0]]))->assertRedirect();
+        $this->assertSame(9.0, TermBook::for($this->group->fresh(), 1)->skillScore($this->ana->id, $mult->id));
+    }
+
+    public function test_skill_by_criteria_rounds_average_to_level(): void
+    {
+        $this->group->termAspects()->create(['term' => 1, 'campo' => 'lenguajes', 'name' => 'Habilidades', 'type' => 'skills', 'weight' => 10]);
+        $writing = $this->group->skills()->create(['campo' => 'lenguajes', 'name' => 'Escritura', 'grading' => 'criteria']);
+        [$c1, $c2, $c3] = [
+            $writing->criteria()->create(['description' => 'Usa mayúsculas', 'position' => 0]),
+            $writing->criteria()->create(['description' => 'Separa palabras', 'position' => 1]),
+            $writing->criteria()->create(['description' => 'Puntuación', 'position' => 2]),
+        ];
+        $app = $writing->applications()->create(['term' => 1]);
+
+        $put = fn ($c, $s) => $this->actingAs($this->teacher)->putJson(route('score.update', $this->group), [
+            'kind' => 'skillcrit', 'id' => $c->id, 'app' => $app->id, 'student_id' => $this->ana->id, 'score' => (string) $s,
+        ]);
+
+        $put($c1, 9)->assertOk();
+        // 9 y 7 → 8 → En proceso (mitad alta)
+        $put($c2, 7)->assertOk()->assertJsonPath('paint.text.app:'.$app->id.':'.$this->ana->id, '8 · En proceso');
+        $put($c2, 10)->assertOk()->assertJsonPath('paint.text.app:'.$app->id.':'.$this->ana->id, '10 · Logrado'); // 9.5 → 10
+        $put($c2, 7)->assertOk();
+        // 9, 7, 7 → 7.67 → En proceso, mitad alta = 8
+        $put($c3, 7)->assertOk()->assertJsonPath('paint.text.app:'.$app->id.':'.$this->ana->id, '8 · En proceso');
+        // 7, 7, 7 → 7 (mitad baja de En proceso)
+        $put($c1, 7)->assertOk()->assertJsonPath('paint.text.app:'.$app->id.':'.$this->ana->id, '7 · En proceso');
+
+        // No se puede calificar la aplicación directa en una habilidad por criterios.
+        $this->score('skill', $app->id, $this->ana, '9')->assertStatus(422);
+
+        $this->actingAs($this->teacher)->get(route('skills.capture', [$this->group, $writing, $app]))
+            ->assertOk()->assertSee('Puntuación')->assertSee('kind="skillcrit"', false);
     }
 
     public function test_measured_skill_scores_from_teacher_ranges(): void
@@ -153,15 +220,16 @@ class NemEvaluationTest extends TestCase
         );
 
         $this->group->termAspects()->create(['term' => 1, 'campo' => 'lenguajes', 'name' => 'Habilidades', 'type' => 'skills', 'weight' => 10]);
-        $this->actingAs($this->teacher)->get(route('capture.skill', [$this->group, $speed]))
+        $app = $speed->applications()->create(['term' => 1, 'applied_on' => '2026-10-20']);
+        $this->actingAs($this->teacher)->get(route('skills.capture', [$this->group, $speed, $app]))
             ->assertOk()->assertSee('100 a 114')->assertSee('data-measure-score', false);
         $this->actingAs($this->teacher)->putJson(route('score.update', $this->group), [
-            'kind' => 'skill', 'id' => $speed->id, 'student_id' => $this->ana->id, 'term' => 1, 'measure' => '103',
+            'kind' => 'skill', 'id' => $app->id, 'student_id' => $this->ana->id, 'measure' => '103',
         ])->assertOk()->assertJsonPath('score', 9)->assertJsonPath('measure', 103)->assertJsonPath('level', 'satisfactorio');
 
         $book = TermBook::for($this->group->fresh(), 1);
-        $this->assertSame(103.0, $book->skillMeasure($this->ana->id, $speed->id));
-        $this->assertSame(9, $book->skillScore($this->ana->id, $speed->id));
+        $this->assertSame(103.0, $book->appMeasure($this->ana->id, $app->id));
+        $this->assertSame(9.0, $book->skillScore($this->ana->id, $speed->id));
 
         // La maestra ajusta los rangos: 103 ppm pasa a valer 10 sin recapturar.
         $this->actingAs($this->teacher)->put(route('campos.update', [$this->group, 'lenguajes']), [
@@ -172,12 +240,14 @@ class NemEvaluationTest extends TestCase
             ],
             'subjects' => $this->group->subjects()->where('campo', 'lenguajes')->get(['id', 'name'])->toArray(),
             'skills' => [[
-                'id' => $speed->id, 'name' => 'Velocidad lectora', 'mode' => 'measure', 'measure_unit' => 'palabras por minuto',
-                'min_7' => '80', 'min_8' => '88', 'min_9' => '95', 'min_10' => '102',
+                'id' => $speed->id, 'name' => 'Velocidad lectora', 'grading' => 'measure', 'measure_unit' => 'palabras por minuto',
+                'min_7' => '80', 'min_9' => '95', 'min_10' => '102',
                 'level_labels' => ['logrado' => 'Avanzado', 'satisfactorio' => 'Estándar', 'proceso' => 'Se acerca al estándar', 'apoyo' => 'Requiere apoyo'],
             ]],
         ])->assertSessionHasNoErrors();
         $this->assertSame(10, $speed->scores()->first()->score);
+        // 7/8 se reparte solo: En proceso 80–94 → 8 desde 87.
+        $this->assertSame(87.0, $speed->fresh()->min_8);
     }
 
     public function test_measured_skill_validation_and_lower_is_better(): void
@@ -187,29 +257,42 @@ class NemEvaluationTest extends TestCase
 
         // Rangos fuera de orden.
         $this->actingAs($this->teacher)->put($url, ['aspects' => $aspects, 'skills' => [[
-            'name' => 'Cálculo', 'mode' => 'measure', 'measure_unit' => 'aciertos', 'min_7' => '10', 'min_8' => '8', 'min_9' => '12', 'min_10' => '15',
+            'name' => 'Cálculo', 'grading' => 'measure', 'measure_unit' => 'aciertos', 'min_7' => '10', 'min_9' => '8', 'min_10' => '15',
         ]]])->assertSessionHasErrors('skills');
 
         // Falta qué se mide.
-        $this->actingAs($this->teacher)->put($url, ['aspects' => $aspects, 'skills' => [['name' => 'Cálculo', 'mode' => 'measure']]])
+        $this->actingAs($this->teacher)->put($url, ['aspects' => $aspects, 'skills' => [['name' => 'Cálculo', 'grading' => 'measure']]])
             ->assertSessionHasErrors('skills');
 
-        // Errores: menos es mejor (rangos de mayor a menor).
+        // Por criterios sin criterios.
+        $this->actingAs($this->teacher)->put($url, ['aspects' => $aspects, 'skills' => [['name' => 'Cálculo', 'grading' => 'criteria']]])
+            ->assertSessionHasErrors('skills');
+
+        // Errores: menos es mejor. En proceso termina en 8, Satisfactorio en 3, Logrado en 1.
         $this->actingAs($this->teacher)->put($url, ['aspects' => $aspects, 'skills' => [[
-            'name' => 'Errores de cálculo', 'mode' => 'measure', 'measure_unit' => 'errores', 'lower_is_better' => '1',
-            'min_7' => '8', 'min_8' => '5', 'min_9' => '3', 'min_10' => '1',
+            'name' => 'Errores de cálculo', 'grading' => 'measure', 'measure_unit' => 'errores', 'lower_is_better' => '1',
+            'min_7' => '8', 'min_9' => '3', 'min_10' => '1',
         ]]])->assertSessionHasNoErrors();
 
         $skill = $this->group->skills()->where('name', 'Errores de cálculo')->first();
-        foreach ([0 => 10, 1 => 10, 2 => 9, 3 => 9, 5 => 8, 8 => 7, 9 => 6] as $errors => $score) {
+        // En proceso = 4 a 8 errores → 8 hasta 6, 7 de 7 a 8.
+        foreach ([0 => 10, 1 => 10, 2 => 9, 3 => 9, 4 => 8, 6 => 8, 7 => 7, 8 => 7, 9 => 6] as $errors => $score) {
             $this->assertSame($score, $skill->scoreFor($errors), "{$errors} errores");
         }
 
-        // "Elijo el nivel" borra la medición y vuelve a calificar por nivel.
+        // "Elijo el nivel" deja de medir.
         $this->actingAs($this->teacher)->put($url, ['aspects' => $aspects, 'skills' => [[
-            'id' => $skill->id, 'name' => 'Errores de cálculo', 'mode' => 'level', 'measure_unit' => 'errores',
+            'id' => $skill->id, 'name' => 'Errores de cálculo', 'grading' => 'level', 'measure_unit' => 'errores',
         ]]])->assertSessionHasNoErrors();
         $this->assertFalse($skill->fresh()->isMeasured());
+
+        // "Por criterios" guarda sus criterios.
+        $this->actingAs($this->teacher)->put($url, ['aspects' => $aspects, 'skills' => [[
+            'id' => $skill->id, 'name' => 'Errores de cálculo', 'grading' => 'criteria',
+            'criteria' => [['description' => 'Acomoda bien las cifras', 'level_logrado' => 'Siempre'], ['description' => '']],
+        ]]])->assertSessionHasNoErrors();
+        $this->assertSame(['Acomoda bien las cifras'], $skill->criteria()->pluck('description')->all());
+        $this->assertTrue($skill->fresh()->isByCriteria());
     }
 
     public function test_skills_aspect_only_in_lenguajes_and_saberes(): void
@@ -222,15 +305,15 @@ class NemEvaluationTest extends TestCase
         $this->actingAs($this->teacher)->put(route('campos.update', [$this->group, 'etica']), $payload)->assertSessionHasErrors('aspects.0.type');
 
         $this->actingAs($this->teacher)->put(route('campos.update', [$this->group, 'saberes']), [...$payload, 'skills' => [
-            ['name' => 'Cálculo mental', 'level_logrado' => 'Resuelve 10 de 10'],
-            ['name' => 'Estimación'],
+            ['name' => 'Cálculo mental', 'grading' => 'level', 'level_logrado' => 'Resuelve 10 de 10'],
+            ['name' => 'Estimación', 'grading' => 'level'],
         ]])->assertSessionHasNoErrors();
 
         $this->assertSame(['Cálculo mental', 'Estimación'], $this->group->skills()->where('campo', 'saberes')->pluck('name')->all());
         $this->assertSame('Resuelve 10 de 10', $this->group->skills()->where('name', 'Cálculo mental')->value('level_logrado'));
 
         $skill = $this->group->skills()->where('name', 'Estimación')->first();
-        $this->actingAs($this->teacher)->get(route('capture.skill', [$this->group, $skill]))->assertOk()->assertSee('Estimación');
+        $this->actingAs($this->teacher)->get(route('skills.show', [$this->group, $skill]))->assertOk()->assertSee('Estimación')->assertSee('Nueva aplicación');
     }
 
     public function test_criteria_only_accept_level_scores(): void
@@ -358,6 +441,43 @@ class NemEvaluationTest extends TestCase
         $pending = collect($book->getSheetByName('Pendientes')->toArray(null, false, false, false))->skip(1);
         $this->assertSame(['Bitácora', 'Educación Física'], $pending->where(4, 'Ana')->map(fn ($r) => str_contains($r[2], 'Bitácora') ? 'Bitácora' : $r[2])->values()->all());
         $this->assertSame(7, $pending->where(4, 'Bruno')->count());
+    }
+
+    public function test_each_aspect_and_skill_downloads_its_own_excel(): void
+    {
+        $this->gradeAnaLenguajes();
+        $load = function ($response) {
+            $response->assertOk();
+            $path = tempnam(sys_get_temp_dir(), 'xlsx');
+            file_put_contents($path, $response->streamedContent());
+            $book = IOFactory::load($path);
+            unlink($path);
+
+            return $book;
+        };
+
+        // Aspecto directo: calificación + matriz de niveles.
+        $exam = $load($this->actingAs($this->teacher)->get(route('export.aspect', [$this->group, $this->exam])));
+        $this->assertSame(['Examen'], $exam->getSheetNames());
+        $this->assertEquals(7, $exam->getActiveSheet()->getCell('C6')->getValue());
+        $this->assertEquals(7, $exam->getActiveSheet()->getCell('F6')->getValue()); // columna "En proceso"
+
+        // Aspecto de proyectos: resumen por producto + hoja del proyecto que aporta.
+        $projects = $this->group->termAspects()->where('type', 'projects')->first();
+        $this->assertSame(['Proyectos', 'P · Germinación'], $load($this->actingAs($this->teacher)->get(route('export.aspect', [$this->group, $projects])))->getSheetNames());
+
+        // Habilidad con dos aplicaciones: avance y promedio.
+        $calc = $this->group->skills()->where('name', 'Cálculo mental')->first();
+        foreach ([6, 10] as $score) {
+            $app = $calc->applications()->create(['term' => 1]);
+            $this->score('skill', $app->id, $this->ana, (string) $score)->assertOk();
+        }
+        $sheet = $load($this->actingAs($this->teacher)->get(route('export.skill', [$this->group, $calc])))->getActiveSheet();
+        $this->assertSame('Promedio', $sheet->getCell('E5')->getValue());
+        $this->assertEquals(8, $sheet->getCell('E6')->getValue());
+        $this->assertEquals(4, $sheet->getCell('G6')->getValue()); // avance 6 → 10
+
+        $this->actingAs($this->teacher)->get(route('export.subject', [$this->group, $this->group->subjects()->first()]))->assertOk();
     }
 
     public function test_main_screens_render(): void

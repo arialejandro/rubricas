@@ -78,10 +78,24 @@
                                 </li>
                             @endforeach
                             @foreach ($book->skillsFor($campo) as $skill)
+                                @php($sk = $book->skillScore($s->id, $skill->id))
                                 <li class="flex min-h-14 items-center gap-3 bg-primary-soft/30 py-2 pr-4 pl-8">
-                                    <span class="flex-1 font-medium">{{ $skill->name }} <span class="text-xs text-ink-muted">habilidad</span></span>
-                                    <x-score kind="skill" :id="$skill->id" :term="$book->term" :student="$s" :unit="$skill->name" :value="$book->skillScore($s->id, $skill->id)"
-                                        :mode="$skill->isMeasured() ? 'measure' : null" :measure="$book->skillMeasure($s->id, $skill->id)" />
+                                    <a href="{{ route('skills.show', [$group, $skill]) }}" class="min-w-0 flex-1">
+                                        <span class="block font-medium hover:text-primary">{{ $skill->name }}</span>
+                                        {{-- Historial: una pastilla por aplicación (avance) --}}
+                                        <span class="mt-1 flex flex-wrap gap-1">
+                                            @forelse ($book->applicationsFor($skill) as $i => $app)
+                                                @php($av = $book->appScore($skill, $app->id, $s->id))
+                                                @php($am = $skill->isMeasured() ? $book->appMeasure($s->id, $app->id) : null)
+                                                <span class="lvl-chip px-2 py-0.5 tabular-nums" @if ($av !== null) data-level="{{ \App\Support\Level::of($av) }}" @endif title="{{ $app->title($i + 1) }}">
+                                                    {{ $av === null ? '—' : ($am !== null ? TermBook::fmt($am).'→'.$av : $av) }}
+                                                </span>
+                                            @empty
+                                                <span class="text-xs text-ink-muted">Sin aplicaciones</span>
+                                            @endforelse
+                                        </span>
+                                    </a>
+                                    <span class="lvl-text inline-grid min-h-12 min-w-14 place-items-center text-lg font-bold tabular-nums" @if ($sk !== null) data-level="{{ Level::of($sk) }}" @endif title="Promedio de las aplicaciones">{{ TermBook::fmt($sk) }}</span>
                                 </li>
                             @endforeach
                             @foreach ($book->subjectsFor($campo) as $sub)

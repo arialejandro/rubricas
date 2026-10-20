@@ -372,6 +372,7 @@ async function save(cell, value, measure = null) {
             body: JSON.stringify({
                 kind: cell.dataset.kind,
                 id: cell.dataset.id,
+                app: cell.dataset.app, // criterio de habilidad: a qué aplicación pertenece
                 term: cell.dataset.term,
                 student_id: cell.dataset.student,
                 // Medible: se manda la medición (vacía = borrar); el servidor calcula la calificación.

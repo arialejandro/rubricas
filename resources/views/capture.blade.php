@@ -43,9 +43,13 @@
         </div>
         <x-progress :value="(int) floor(($total - $missing) * 100 / max(1, $total))" :bar="$unitKey" class="mb-4" />
 
+        @if ($kind === 'skill')
+            @include('skills._application-settings', ['skill' => $skill, 'application' => $unit])
+        @endif
+
         {{-- La rúbrica (o la tabla de equivalencias de la medición) a la vista mientras se califica --}}
         @if ($mode === 'measure')
-            <x-skill-ranges :skill="$unit" :title="false" class="mb-4" />
+            <x-skill-ranges :skill="$skill" :title="false" class="mb-4" />
         @elseif ($descriptors)
             <details class="card group mb-4" open>
                 <summary class="flex min-h-12 list-none items-center gap-2 px-4 text-sm font-semibold">
@@ -67,23 +71,27 @@
         </div>
 
         <ul class="card divide-y divide-line" data-score-url="{{ route('score.update', $group) }}" data-descriptors="{{ $descriptorsJson }}">
-            @if ($mode === 'measure')
-                <li class="flex items-center gap-3 bg-surface-2 px-4 py-2 text-xs font-semibold text-ink-muted">
-                    <span class="w-7 text-right">N.L.</span>
-                    <span class="flex-1">Alumno</span>
-                    <span class="min-w-20 text-center">{{ ucfirst($unit->measure_unit) }}</span>
-                    <span class="min-w-32 text-center">Calificación</span>
-                </li>
-            @endif
+            {{-- Rejilla de columnas fijas: N.L. · nombre · captura (· calificación), alineadas en todos los renglones --}}
+            @php($grid = $mode === 'measure' ? 'grid-cols-[2rem_minmax(0,1fr)_5.5rem_11.5rem]' : 'grid-cols-[2rem_minmax(0,1fr)_5.5rem]')
+            <li class="grid {{ $grid }} items-center gap-3 bg-surface-2 px-4 py-2 text-xs font-semibold text-ink-muted">
+                <span class="text-right">N.L.</span>
+                <span>Alumno</span>
+                @if ($mode === 'measure')
+                    <span class="text-center">{{ ucfirst($skill->measure_unit) }}</span>
+                    <span class="text-center">Calificación</span>
+                @else
+                    <span class="text-center">Calificación</span>
+                @endif
+            </li>
             @foreach ($book->students as $s)
                 @php($score = $value($s))
-                <li class="flex min-h-16 items-center gap-3 px-4 py-2"
+                <li class="grid {{ $grid }} min-h-16 items-center gap-3 px-4 py-2"
                     data-search-item data-search-text="{{ $s->name }}" data-search-number="{{ $s->list_number }}"
                     data-done="{{ $score === null ? 0 : 1 }}" data-done-by="cell">
-                    <span class="w-7 text-right text-sm font-semibold tabular-nums text-ink-muted">{{ $s->list_number }}</span>
-                    <span class="min-w-0 flex-1 text-base font-medium">{{ $s->name }}</span>
+                    <span class="text-right text-sm font-semibold tabular-nums text-ink-muted">{{ $s->list_number }}</span>
+                    <span class="min-w-0 truncate text-base font-medium" title="{{ $s->name }}">{{ $s->name }}</span>
                     <x-score :kind="$kind" :id="$unit->id" :term="in_array($kind, ['subject', 'skill'], true) ? $term : null" :student="$s" :unit="$title" :value="$score"
-                                 :mode="$mode" :measure="$measure ? $measure($s) : null" :labels="$mode === 'measure' ? $labels : null" class="min-h-14 min-w-20 text-xl" />
+                                 :mode="$mode" :measure="$measure ? $measure($s) : null" :labels="$mode === 'measure' ? $labels : null" wrap="contents" class="min-h-14 w-full text-xl" />
                 </li>
             @endforeach
             <li class="p-6 text-center text-ink-muted" data-search-empty hidden>Ningún alumno coincide.</li>

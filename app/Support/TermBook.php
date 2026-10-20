@@ -9,6 +9,8 @@ use App\Models\Group;
 use App\Models\Product;
 use App\Models\Project;
 use App\Models\Skill;
+use App\Models\SkillApplication;
+use App\Models\SkillCriterionScore;
 use App\Models\SkillScore;
 use App\Models\Student;
 use App\Models\Subject;
@@ -42,11 +44,17 @@ class TermBook
     /** @var array<int, array<int, float>> [student][subject] */
     private array $sub = [];
 
-    /** @var array<int, array<int, int>> [student][skill] */
+    /** @var array<int, array<int, int>> [student][application] calificación (modos nivel y medición) */
     private array $skl = [];
 
-    /** @var array<int, array<int, float>> [student][skill] medición de habilidades medibles */
+    /** @var array<int, array<int, float>> [student][application] medición de habilidades medibles */
     private array $skm = [];
+
+    /** @var array<int, array<int, array<int, int>>> [student][application][skill_criterion] */
+    private array $skc = [];
+
+    /** @var Collection<int, Collection<int, SkillApplication>> aplicaciones del trimestre por skill_id */
+    public Collection $apps;
 
     /** @var Collection<int, Skill> */
     public Collection $skills;
@@ -94,14 +102,25 @@ class TermBook
             ->get(['subject_id', 'student_id', 'score'])
             ->each(function ($r) use ($book) { $book->sub[$r->student_id][$r->subject_id] = $r->score; });
 
-        $book->skills = $group->skills()->get();
-        SkillScore::whereIn('skill_id', $book->skills->pluck('id'))->whereIn('student_id', $ids)->where('term', $term)
-            ->get(['skill_id', 'student_id', 'score', 'measure'])
+        // Habilidades: aplicaciones del trimestre + calificaciones por aplicación (y por criterio).
+        $book->skills = $group->skills()->with('criteria')->get();
+        $book->apps = SkillApplication::whereIn('skill_id', $book->skills->pluck('id'))->where('term', $term)
+            ->orderByRaw('applied_on IS NULL, applied_on')->orderBy('id')->get()->groupBy('skill_id');
+        $appIds = $book->apps->flatten()->pluck('id');
+
+        SkillScore::whereIn('skill_application_id', $appIds)->whereIn('student_id', $ids)
+            ->get(['skill_application_id', 'student_id', 'score', 'measure'])
             ->each(function ($r) use ($book) {
-                $book->skl[$r->student_id][$r->skill_id] = $r->score;
+                $book->skl[$r->student_id][$r->skill_application_id] = $r->score;
                 if ($r->measure !== null) {
-                    $book->skm[$r->student_id][$r->skill_id] = $r->measure;
+                    $book->skm[$r->student_id][$r->skill_application_id] = $r->measure;
                 }
+            });
+
+        SkillCriterionScore::whereIn('skill_application_id', $appIds)->whereIn('student_id', $ids)
+            ->get(['skill_application_id', 'skill_criterion_id', 'student_id', 'score'])
+            ->each(function ($r) use ($book) {
+                $book->skc[$r->student_id][$r->skill_application_id][$r->skill_criterion_id] = $r->score;
             });
 
         return $book;
@@ -191,14 +210,80 @@ class TermBook
         return $this->sub[$studentId][$subjectId] ?? null;
     }
 
-    public function skillScore(int $studentId, int $skillId): ?int
+    // ---------------------------------------------------------------- habilidades (por aplicación)
+
+    /** @return Collection<int, SkillApplication> aplicaciones de la habilidad en el trimestre, en orden */
+    public function applicationsFor(Skill $skill): Collection
     {
-        return $this->skl[$studentId][$skillId] ?? null;
+        return $this->apps->get($skill->id, collect())->values();
     }
 
-    public function skillMeasure(int $studentId, int $skillId): ?float
+    public function appMeasure(int $studentId, int $appId): ?float
     {
-        return $this->skm[$studentId][$skillId] ?? null;
+        return $this->skm[$studentId][$appId] ?? null;
+    }
+
+    public function appCriterionScore(int $studentId, int $appId, int $criterionId): ?int
+    {
+        return $this->skc[$studentId][$appId][$criterionId] ?? null;
+    }
+
+    /**
+     * Calificación del alumno en una aplicación. Por criterios: promedio de los criterios
+     * calificados, redondeado al nivel (En proceso queda en 7 u 8 según la mitad del rango).
+     */
+    public function appScore(Skill $skill, int $appId, int $studentId): ?int
+    {
+        if (! $skill->isByCriteria()) {
+            return $this->skl[$studentId][$appId] ?? null;
+        }
+
+        $scores = array_values($this->skc[$studentId][$appId] ?? []);
+
+        return $scores === [] ? null : Skill::scoreFromCriteria(array_sum($scores) / count($scores));
+    }
+
+    /** Pendientes del alumno en una aplicación (por criterios: cada criterio sin calificar). */
+    public function appMissing(Skill $skill, int $appId, int $studentId): int
+    {
+        if (! $skill->isByCriteria()) {
+            return isset($this->skl[$studentId][$appId]) ? 0 : 1;
+        }
+        if ($skill->criteria->isEmpty()) {
+            return 1; // falta definir los criterios
+        }
+
+        return $skill->criteria->filter(fn ($c) => ! isset($this->skc[$studentId][$appId][$c->id]))->count();
+    }
+
+    /** Valor de la habilidad en el trimestre: PROMEDIO de sus aplicaciones calificadas. */
+    public function skillScore(int $studentId, int $skillId): ?float
+    {
+        $skill = $this->skills->firstWhere('id', $skillId);
+        if ($skill === null) {
+            return null;
+        }
+        $scores = $this->applicationsFor($skill)->map(fn ($a) => $this->appScore($skill, $a->id, $studentId))->filter(fn ($v) => $v !== null);
+
+        return $scores->isEmpty() ? null : round($scores->avg(), 2);
+    }
+
+    /** Celdas por alumno de una habilidad: aplicaciones × (criterios o 1). Sin aplicaciones cuenta como 1. */
+    public function skillCells(Skill $skill): int
+    {
+        $perApp = $skill->isByCriteria() ? max(1, $skill->criteria->count()) : 1;
+
+        return max(1, $this->applicationsFor($skill)->count()) * $perApp;
+    }
+
+    public function skillMissingFor(Skill $skill, Student $s): int
+    {
+        $apps = $this->applicationsFor($skill);
+        if ($apps->isEmpty()) {
+            return $this->skillCells($skill);
+        }
+
+        return $apps->sum(fn ($a) => $this->appMissing($skill, $a->id, $s->id));
     }
 
     // ---------------------------------------------------------------- derivadas
@@ -296,7 +381,7 @@ class TermBook
     {
         $n = $this->productsFor($campo)->sum(fn ($p) => $p->criteria->count())
             + $this->directAspectsFor($campo)->count()
-            + $this->skillsFor($campo)->count()
+            + $this->skillsFor($campo)->sum(fn ($k) => $this->skillCells($k))
             + $this->subjectsFor($campo)->count();
 
         return $n + $this->structuralGaps($campo);
@@ -321,15 +406,24 @@ class TermBook
     {
         $missing = $this->productsFor($campo)->sum(fn ($p) => $this->productMissing($p, $s))
             + $this->directAspectsFor($campo)->filter(fn ($a) => $this->aspectScore($s->id, $a->id) === null)->count()
-            + $this->skillsFor($campo)->filter(fn ($k) => $this->skillScore($s->id, $k->id) === null)->count()
+            + $this->skillsFor($campo)->sum(fn ($k) => $this->skillMissingFor($k, $s))
             + $this->subjectsFor($campo)->filter(fn ($sub) => $this->subjectScore($s->id, $sub->id) === null)->count();
 
         return $missing + $this->structuralGaps($campo);
     }
 
+    /** Alumnos con algo pendiente en la habilidad (en cualquiera de sus aplicaciones). */
     public function skillMissing(Skill $skill): int
     {
-        return $this->students->filter(fn ($s) => $this->skillScore($s->id, $skill->id) === null)->count();
+        return $this->students->filter(fn ($s) => $this->skillMissingFor($skill, $s) > 0)->count();
+    }
+
+    /** Alumnos sin calificar en una aplicación (o en un criterio de esa aplicación). */
+    public function appStudentsMissing(Skill $skill, int $appId, ?int $criterionId = null): int
+    {
+        return $this->students->filter(fn ($s) => $criterionId
+            ? $this->appCriterionScore($s->id, $appId, $criterionId) === null
+            : $this->appMissing($skill, $appId, $s->id) > 0)->count();
     }
 
     public function campoComplete(string $campo, Student $s): bool
@@ -415,9 +509,21 @@ class TermBook
      *
      * @return array{text: array<string,string>, level: array<string,?string>, bar: array<string,int>, done: array<string,bool>}
      */
-    public function paint(Student $s, string $campo, ?Product $product = null, ?string $unitKey = null, ?int $unitMissing = null): array
+    public function paint(Student $s, string $campo, ?Product $product = null, ?string $unitKey = null, ?int $unitMissing = null, ?Skill $skill = null, ?int $appId = null): array
     {
         $out = ['text' => [], 'level' => [], 'bar' => [], 'done' => []];
+
+        if ($skill) {
+            $avg = $this->skillScore($s->id, $skill->id);
+            $out['text']["skill:{$skill->id}:{$s->id}"] = self::fmt($avg);
+            $out['level']["skill:{$skill->id}:{$s->id}"] = Level::of($avg);
+            if ($appId) {
+                $as = $this->appScore($skill, $appId, $s->id);
+                $complete = $this->appMissing($skill, $appId, $s->id) === 0;
+                $out['text']["app:{$appId}:{$s->id}"] = $as === null ? '—' : $as.' · '.$skill->levelLabel(Level::of($as));
+                $out['level']["app:{$appId}:{$s->id}"] = $as === null ? null : ($complete ? Level::of($as) : 'provisional');
+            }
+        }
 
         $final = $this->campoFinal($campo, $s);
         $base = $this->campoBase($campo, $s);

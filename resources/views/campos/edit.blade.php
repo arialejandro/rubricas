@@ -7,7 +7,8 @@
         : Campos::defaultAspects($campo));
     $subjectRows = old('subjects', $subjects->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->all());
     $skillRows = old('skills', $skills->map(fn ($k) => [
-        'id' => $k->id, 'name' => $k->name, 'graded' => $k->scores_count,
+        'id' => $k->id, 'name' => $k->name, 'graded' => $k->scores_count, 'grading' => $k->grading,
+        'criteria' => $k->criteria->map(fn ($c) => $c->only(['id', 'description', 'level_logrado', 'level_satisfactorio', 'level_proceso', 'level_apoyo']))->all(),
         'measure_unit' => $k->measure_unit, 'lower_is_better' => $k->lower_is_better,
         'min_7' => $k->min_7, 'min_8' => $k->min_8, 'min_9' => $k->min_9, 'min_10' => $k->min_10,
         'level_labels' => $k->level_labels ?? [],

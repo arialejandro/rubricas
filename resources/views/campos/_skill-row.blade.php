@@ -1,50 +1,64 @@
 @use('App\Support\Level')
+@use('App\Models\Skill')
 @php
     $num = fn ($v) => $v === null || $v === '' ? '' : rtrim(rtrim(number_format((float) $v, 2, '.', ''), '0'), '.');
-    $measured = filled($row['measure_unit'] ?? null);
+    $grading = $row['grading'] ?? 'level';
     $lower = ! empty($row['lower_is_better']);
+    $criteria = $row['criteria'] ?? [];
 @endphp
 <div class="rounded-2xl border border-line p-3" data-repeater-row data-skill-row>
     <input type="hidden" name="skills[{{ $i }}][id]" value="{{ $row['id'] ?? '' }}">
     <div class="flex items-center gap-2">
-        <input class="input flex-1 font-semibold" name="skills[{{ $i }}][name]" value="{{ $row['name'] ?? '' }}" placeholder="Habilidad (ej. Velocidad lectora)" aria-label="Habilidad">
+        <input class="input flex-1 font-semibold" name="skills[{{ $i }}][name]" value="{{ $row['name'] ?? '' }}" placeholder="Habilidad (ej. Multiplicación)" aria-label="Habilidad">
         <button type="button" class="btn btn-ghost btn-icon shrink-0 text-ink-muted hover:text-danger" aria-label="Quitar habilidad"
-                title="{{ ! empty($row['graded']) ? 'Tiene '.$row['graded'].' calificaciones' : 'Quitar' }}" data-repeater-remove><x-icon name="x" /></button>
+                title="{{ ! empty($row['graded']) ? 'Tiene calificaciones' : 'Quitar' }}" data-repeater-remove><x-icon name="x" /></button>
     </div>
 
     {{-- Cómo se califica --}}
-    <div class="mt-2 flex gap-2" role="radiogroup" aria-label="Cómo se califica">
-        <label class="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-line px-3 text-sm font-semibold text-ink-muted has-checked:border-primary has-checked:bg-primary-soft has-checked:text-primary">
-            <input type="radio" class="sr-only" name="skills[{{ $i }}][mode]" value="level" data-skill-mode @checked(! $measured)> Elijo el nivel
-        </label>
-        <label class="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-line px-3 text-sm font-semibold text-ink-muted has-checked:border-primary has-checked:bg-primary-soft has-checked:text-primary">
-            <input type="radio" class="sr-only" name="skills[{{ $i }}][mode]" value="measure" data-skill-mode @checked($measured)> Mido y se calcula
-        </label>
+    <div class="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Cómo se califica">
+        @foreach (Skill::GRADINGS as $value => $label)
+            <label class="flex min-h-11 items-center justify-center rounded-xl border border-line px-2 text-center text-sm font-semibold leading-tight text-ink-muted has-checked:border-primary has-checked:bg-primary-soft has-checked:text-primary">
+                <input type="radio" class="sr-only" name="skills[{{ $i }}][grading]" value="{{ $value }}" data-skill-mode @checked($grading === $value)> {{ $label }}
+            </label>
+        @endforeach
     </div>
 
-    {{-- Medición: unidad + rangos --}}
-    <div class="mt-3 space-y-3 rounded-xl bg-surface-2 p-3" data-skill-measure @unless ($measured) hidden @endunless>
+    {{-- Mido y se calcula: unidad + dónde empieza cada nivel --}}
+    <div class="mt-3 space-y-3 rounded-xl bg-surface-2 p-3" data-skill-panel="measure" @unless ($grading === 'measure') hidden @endunless>
         <div class="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
-            <div>
-                <label class="label">Qué se mide</label>
-                <input class="input" name="skills[{{ $i }}][measure_unit]" value="{{ $row['measure_unit'] ?? '' }}" placeholder="palabras por minuto, aciertos, errores…" list="measure-units" data-skill-unit>
-            </div>
+            <label class="block"><span class="label">Qué se mide</span>
+                <input class="input" name="skills[{{ $i }}][measure_unit]" value="{{ $row['measure_unit'] ?? '' }}" placeholder="palabras por minuto, aciertos, errores…" list="measure-units">
+            </label>
             <label class="flex min-h-12 items-center gap-2 text-sm font-medium">
                 <input type="checkbox" class="size-5" name="skills[{{ $i }}][lower_is_better]" value="1" @checked($lower) data-skill-lower> Menos es mejor
             </label>
         </div>
         <div>
-            <p class="label">Rangos <span class="font-normal text-ink-muted" data-skill-cut-hint>{{ $lower ? '(hasta cuánto vale cada calificación)' : '(desde cuánto vale cada calificación)' }}</span></p>
-            <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                @foreach (['min_10' => [10, 'logrado'], 'min_9' => [9, 'satisfactorio'], 'min_8' => [8, 'proceso'], 'min_7' => [7, 'proceso']] as $col => [$score, $lvl])
+            <p class="label">Dónde <span data-skill-cut-word>{{ $lower ? 'termina' : 'empieza' }}</span> cada nivel</p>
+            <div class="grid grid-cols-3 gap-2">
+                @foreach (['min_7' => ['proceso', 'En proceso (7–8)'], 'min_9' => ['satisfactorio', 'Satisfactorio (9)'], 'min_10' => ['logrado', 'Logrado (10)']] as $col => [$lvl, $text])
                     <label class="block rounded-xl p-2" data-level="{{ $lvl }}" style="background: var(--lvl-soft)">
-                        <span class="mb-1 block text-xs font-bold" style="color: var(--lvl)"><span data-skill-cut-word>{{ $lower ? 'Hasta' : 'Desde' }}</span> = {{ $score }}</span>
+                        <span class="mb-1 block text-xs font-bold leading-tight" style="color: var(--lvl)">{{ $text }}</span>
                         <input class="input bg-surface text-center font-bold tabular-nums" name="skills[{{ $i }}][{{ $col }}]" value="{{ $num($row[$col] ?? null) }}" inputmode="decimal">
                     </label>
                 @endforeach
             </div>
-            <p class="hint">Lo que quede fuera de estos rangos vale 6. Ej. velocidad lectora: desde 115 = 10, desde 100 = 9, desde 92 = 8, desde 85 = 7, menos de 85 = 6.</p>
+            <p class="hint">Fuera de esos rangos es Requiere apoyo (6). En proceso se divide a la mitad entre su valor más bajo y el más alto: la primera mitad es 7 y la segunda 8. Ej. En proceso 85, Satisfactorio 100 → 85–91 = 7, 92–99 = 8.</p>
         </div>
+    </div>
+
+    {{-- Por criterios: cada criterio con su descriptor por nivel --}}
+    <div class="mt-3 space-y-3 rounded-xl bg-surface-2 p-3" data-skill-panel="criteria" @unless ($grading === 'criteria') hidden @endunless>
+        <p class="text-sm text-ink-muted">Cada criterio se califica por nivel; la calificación de la habilidad es su promedio, redondeado al nivel.</p>
+        <section class="space-y-2" data-repeater data-max="10">
+            <div class="space-y-2" data-repeater-list>
+                @foreach ($criteria as $j => $c)
+                    @include('campos._skill-criterion-row', ['i' => $i, 'j' => $j, 'c' => $c])
+                @endforeach
+            </div>
+            <template>@include('campos._skill-criterion-row', ['i' => $i, 'j' => '__CIDX__', 'c' => []])</template>
+            <button type="button" class="btn btn-ghost min-h-10" data-repeater-add data-placeholder="__CIDX__"><x-icon name="plus" class="size-4" /> Agregar criterio</button>
+        </section>
     </div>
 
     <details class="group mt-2">

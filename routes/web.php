@@ -9,6 +9,7 @@ use App\Http\Controllers\GroupController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ScoreController;
+use App\Http\Controllers\SkillController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\TermController;
 use App\Support\Campos;
@@ -45,7 +46,12 @@ Route::middleware('auth')->group(function () {
         // Captura alumno por alumno (teclado) + guardado de una celda
         Route::get('capturar/aspecto/{termAspect}', [CaptureController::class, 'aspect'])->name('capture.aspect');
         Route::get('capturar/materia/{subject}', [CaptureController::class, 'subject'])->name('capture.subject');
-        Route::get('capturar/habilidad/{skill}', [CaptureController::class, 'skill'])->name('capture.skill');
+        // Habilidades prioritarias: avance del trimestre, aplicaciones (varias por trimestre) y captura.
+        Route::get('habilidades/{skill}', [SkillController::class, 'show'])->name('skills.show');
+        Route::post('habilidades/{skill}/aplicaciones', [SkillController::class, 'storeApplication'])->name('skills.applications.store');
+        Route::get('habilidades/{skill}/aplicaciones/{application}', [SkillController::class, 'capture'])->name('skills.capture');
+        Route::put('habilidades/{skill}/aplicaciones/{application}', [SkillController::class, 'updateApplication'])->name('skills.applications.update');
+        Route::delete('habilidades/{skill}/aplicaciones/{application}', [SkillController::class, 'destroyApplication'])->name('skills.applications.destroy');
         Route::get('proyectos/{project}/productos/{product}/criterios/{criterion}', [CaptureController::class, 'criterion'])->name('capture.criterion');
         Route::put('calificar', ScoreController::class)->name('score.update');
 
@@ -65,5 +71,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('alumnos/{student}', [StudentController::class, 'destroy'])->name('students.destroy');
 
         Route::get('excel', ExportController::class)->name('export.group');
+        Route::get('excel/aspecto/{termAspect}', [ExportController::class, 'aspect'])->name('export.aspect');
+        Route::get('excel/habilidad/{skill}', [ExportController::class, 'skill'])->name('export.skill');
+        Route::get('excel/materia/{subject}', [ExportController::class, 'subject'])->name('export.subject');
     });
 });

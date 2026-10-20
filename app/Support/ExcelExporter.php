@@ -4,6 +4,9 @@ namespace App\Support;
 
 use App\Models\Group;
 use App\Models\Project;
+use App\Models\Skill;
+use App\Models\Subject;
+use App\Models\TermAspect;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -58,7 +61,178 @@ class ExcelExporter
         return $self->wb;
     }
 
+    /**
+     * Excel de UN aspecto del trimestre:
+     *   directo   → calificación de cada alumno + matriz de niveles
+     *   proyectos → promedio por producto del campo + una hoja por proyecto que aporta
+     *   habilidades → promedio por habilidad + una hoja de avance por habilidad
+     */
+    public static function forAspect(Group $group, TermAspect $aspect): Spreadsheet
+    {
+        $self = new self(TermBook::for($group, $aspect->term));
+        $self->aspectSheet($self->wb->getActiveSheet(), $aspect);
+
+        if ($aspect->isFromProjects()) {
+            $projectIds = $self->book->productsFor($aspect->campo)->pluck('project_id')->unique();
+            foreach ($self->book->projects->whereIn('id', $projectIds) as $project) {
+                $self->projectSheet($self->wb->createSheet(), $project);
+            }
+        }
+        if ($aspect->isFromSkills()) {
+            foreach ($self->book->skillsFor($aspect->campo) as $skill) {
+                $self->skillSheet($self->wb->createSheet(), $skill);
+            }
+        }
+        $self->wb->setActiveSheetIndex(0);
+
+        return $self->wb;
+    }
+
+    /** Excel de una habilidad: avance alumno × aplicación + promedio del trimestre. */
+    public static function forSkill(Group $group, Skill $skill): Spreadsheet
+    {
+        $self = new self(TermBook::for($group));
+        $self->skillSheet($self->wb->getActiveSheet(), $self->book->skills->firstWhere('id', $skill->id));
+
+        return $self->wb;
+    }
+
+    /** Excel de una materia adicional en el trimestre. */
+    public static function forSubject(Group $group, Subject $subject): Spreadsheet
+    {
+        $self = new self(TermBook::for($group));
+        $sheet = $self->wb->getActiveSheet()->setTitle($self->title($subject->name));
+        $first = $self->header($sheet, $subject->name.' · '.Campos::name($subject->campo).' · Trimestre '.$self->book->term);
+        $self->simpleTable($sheet, $first, 'Calificación', fn ($s) => $self->book->subjectScore($s->id, $subject->id));
+
+        return $self->wb;
+    }
+
     // ------------------------------------------------------------------ hojas
+
+    private function aspectSheet(Worksheet $sheet, TermAspect $aspect): void
+    {
+        $sheet->setTitle($this->title($aspect->name));
+        $first = $this->header($sheet, $aspect->name.' ('.TermBook::fmt($aspect->weight).'%) · '.Campos::name($aspect->campo).' · Trimestre '.$aspect->term);
+
+        if ($aspect->isDirect()) {
+            $this->simpleTable($sheet, $first, 'Calificación', fn ($s) => $this->book->aspectScore($s->id, $aspect->id));
+
+            return;
+        }
+
+        // Calculado: una columna por lo que lo alimenta + el valor del aspecto.
+        $parts = $aspect->isFromProjects()
+            ? $this->book->productsFor($aspect->campo)->map(fn ($p) => [$p->project->name.' · '.$p->name, fn ($s) => $this->book->productScore($p, $s)])
+            : $this->book->skillsFor($aspect->campo)->map(fn ($k) => [$k->name, fn ($s) => $this->book->skillScore($s->id, $k->id)]);
+
+        $cols = ['N.L.', 'Alumno', ...$parts->pluck(0)->all(), $aspect->name, ...array_map(fn ($l) => $l['label'], Level::LEVELS)];
+        $sheet->fromArray($cols, null, "A{$first}");
+        $last = Coordinate::stringFromColumnIndex(count($cols));
+        $this->styleHeader($sheet, "A{$first}:{$last}{$first}");
+        $this->colorLevelHeaders($sheet, count($cols) - 3, $first);
+        $sheet->getRowDimension($first)->setRowHeight(45);
+
+        $r = $first + 1;
+        foreach ($this->book->students as $s) {
+            $sheet->setCellValue("A{$r}", $s->list_number);
+            $sheet->setCellValue("B{$r}", $s->name);
+            $col = 3;
+            foreach ($parts as [, $value]) {
+                $v = $value($s);
+                $this->levelValue($sheet, $col++, $r, $v, $v !== null);
+            }
+            $v = $this->book->aspectValue($aspect, $s);
+            $this->levelValue($sheet, $col++, $r, $v, $v !== null);
+            $this->levelMatrix($sheet, $col, $r, $v);
+            $r++;
+        }
+        $this->finishTable($sheet, $first, $r - 1, $last, [34]);
+    }
+
+    /** N.L. · Alumno · valor · matriz de 4 niveles. */
+    private function simpleTable(Worksheet $sheet, int $first, string $label, \Closure $value): void
+    {
+        $cols = ['N.L.', 'Alumno', $label, ...array_map(fn ($l) => $l['label'], Level::LEVELS)];
+        $sheet->fromArray($cols, null, "A{$first}");
+        $this->styleHeader($sheet, "A{$first}:G{$first}");
+        $this->colorLevelHeaders($sheet, 4, $first);
+
+        $r = $first + 1;
+        foreach ($this->book->students as $s) {
+            $v = $value($s);
+            $sheet->setCellValue("A{$r}", $s->list_number);
+            $sheet->setCellValue("B{$r}", $s->name);
+            $this->levelValue($sheet, 3, $r, $v, $v !== null);
+            $this->levelMatrix($sheet, 4, $r, $v);
+            $r++;
+        }
+        $this->finishTable($sheet, $first, $r - 1, 'G', [34]);
+    }
+
+    /** Avance de una habilidad: aplicación por aplicación (medición o criterios) + promedio y diferencia. */
+    private function skillSheet(Worksheet $sheet, Skill $skill): void
+    {
+        $sheet->setTitle($this->title('H · '.$skill->name));
+        $first = $this->header($sheet, $skill->name.' · '.Campos::name($skill->campo).' · Trimestre '.$this->book->term
+            .' · '.Skill::GRADINGS[$skill->grading].($skill->isMeasured() ? ' ('.$skill->measure_unit.')' : ''));
+        $apps = $this->book->applicationsFor($skill)->values();
+
+        $cols = ['N.L.', 'Alumno'];
+        foreach ($apps as $i => $app) {
+            if ($skill->isByCriteria()) {
+                foreach ($skill->criteria as $j => $c) {
+                    $cols[] = $app->title($i + 1).' · '.($j + 1).'. '.$c->description;
+                }
+            }
+            if ($skill->isMeasured()) {
+                $cols[] = $app->title($i + 1).' · '.$skill->measure_unit;
+            }
+            $cols[] = $app->title($i + 1).' · calificación';
+        }
+        $cols = [...$cols, 'Promedio', 'Nivel', 'Avance (1ª → última)'];
+        $sheet->fromArray($cols, null, "A{$first}");
+        $last = Coordinate::stringFromColumnIndex(count($cols));
+        $this->styleHeader($sheet, "A{$first}:{$last}{$first}");
+        $sheet->getRowDimension($first)->setRowHeight(60);
+
+        $r = $first + 1;
+        foreach ($this->book->students as $s) {
+            $sheet->setCellValue("A{$r}", $s->list_number);
+            $sheet->setCellValue("B{$r}", $s->name);
+            $col = 3;
+            $series = [];
+            foreach ($apps as $app) {
+                if ($skill->isByCriteria()) {
+                    foreach ($skill->criteria as $c) {
+                        $v = $this->book->appCriterionScore($s->id, $app->id, $c->id);
+                        $this->levelValue($sheet, $col++, $r, $v === null ? null : (float) $v, $v !== null);
+                    }
+                }
+                if ($skill->isMeasured()) {
+                    $m = $this->book->appMeasure($s->id, $app->id);
+                    $cell = Coordinate::stringFromColumnIndex($col++).$r;
+                    $m === null
+                        ? $sheet->getStyle($cell)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB(self::MISSING_FILL)
+                        : $sheet->setCellValue($cell, $m);
+                }
+                $v = $this->book->appScore($skill, $app->id, $s->id);
+                $this->levelValue($sheet, $col++, $r, $v === null ? null : (float) $v, $v !== null && $this->book->appMissing($skill, $app->id, $s->id) === 0);
+                if ($v !== null) {
+                    $series[] = $v;
+                }
+            }
+            $avg = $this->book->skillScore($s->id, $skill->id);
+            $this->levelValue($sheet, $col++, $r, $avg, $avg !== null);
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex($col++).$r, $avg === null ? '' : $skill->levelLabel(Level::of($avg)));
+            if (count($series) >= 2) {
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($col).$r, end($series) - $series[0]);
+            }
+            $r++;
+        }
+        $this->finishTable($sheet, $first, $r - 1, $last, [34]);
+        $this->note($sheet, $r + 1, 'La calificación de la habilidad es el promedio de sus aplicaciones. Avance = última aplicación − primera.');
+    }
 
     private function summarySheet(Worksheet $sheet): void
     {
@@ -117,10 +291,7 @@ class ExcelExporter
             };
         }
         foreach ($skills as $k) {
-            if ($k->isMeasured()) {
-                $cols[] = $k->name.' ('.$k->measure_unit.')';
-            }
-            $cols[] = $k->name.' (habilidad)';
+            $cols[] = $k->name.' (promedio de '.$this->book->applicationsFor($k)->count().' aplic.)';
         }
         $cols[] = 'Base del campo';
         foreach ($subjects as $sub) {
@@ -148,15 +319,8 @@ class ExcelExporter
                 $this->levelValue($sheet, $col++, $r, $v, $v !== null);
             }
             foreach ($skills as $k) {
-                if ($k->isMeasured()) {
-                    $measure = $this->book->skillMeasure($s->id, $k->id);
-                    $cell = Coordinate::stringFromColumnIndex($col++).$r;
-                    $measure === null
-                        ? $sheet->getStyle($cell)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB(self::MISSING_FILL)
-                        : $sheet->setCellValue($cell, $measure);
-                }
                 $v = $this->book->skillScore($s->id, $k->id);
-                $this->levelValue($sheet, $col++, $r, $v === null ? null : (float) $v, $v !== null);
+                $this->levelValue($sheet, $col++, $r, $v, $v !== null && $this->book->skillMissingFor($k, $s) === 0);
             }
             $this->levelValue($sheet, $col++, $r, $this->book->campoBase($campo, $s), true);
             foreach ($subjects as $sub) {
@@ -288,10 +452,17 @@ class ExcelExporter
             foreach ($this->book->skillsFor($campo) as $k) {
                 $d = $k->descriptors();
                 $sheet->fromArray([
-                    'Habilidad prioritaria', $k->name, Campos::name($campo), $k->isMeasured() ? 'Medición: '.$k->measure_unit : 'Niveles', $k->name,
+                    'Habilidad prioritaria', $k->name, Campos::name($campo), Skill::GRADINGS[$k->grading].($k->isMeasured() ? ': '.$k->measure_unit : ''), $k->name,
                     ...array_map(fn ($lvl) => $k->levelLabel($lvl).(isset($d[$lvl]) ? ': '.$d[$lvl] : ''), array_keys(Level::LEVELS)),
                 ], null, "A{$r}");
                 $r++;
+                foreach ($k->isByCriteria() ? $k->criteria : [] as $c) {
+                    $sheet->fromArray([
+                        'Habilidad prioritaria', $k->name, Campos::name($campo), 'Criterio', $c->description,
+                        ...array_map(fn ($lvl) => $c->{Level::column($lvl)}, array_keys(Level::LEVELS)),
+                    ], null, "A{$r}");
+                    $r++;
+                }
             }
         }
         foreach (['A' => 26, 'B' => 24, 'C' => 22, 'D' => 16, 'E' => 34, 'F' => 34, 'G' => 34, 'H' => 34, 'I' => 34] as $c => $w) {
@@ -323,8 +494,14 @@ class ExcelExporter
                     }
                 }
                 foreach ($this->book->skillsFor($campo) as $k) {
-                    if ($this->book->skillScore($s->id, $k->id) === null) {
-                        $rows[] = [Campos::short($campo), 'Habilidad', $k->name, $s->list_number, $s->name];
+                    $apps = $this->book->applicationsFor($k);
+                    if ($apps->isEmpty()) {
+                        $rows[] = [Campos::short($campo), 'Habilidad', $k->name.' · sin aplicaciones', $s->list_number, $s->name];
+                    }
+                    foreach ($apps as $i => $app) {
+                        if ($this->book->appMissing($k, $app->id, $s->id) > 0) {
+                            $rows[] = [Campos::short($campo), 'Habilidad', $k->name.' · '.$app->title($i + 1), $s->list_number, $s->name];
+                        }
                     }
                 }
                 foreach ($this->book->subjectsFor($campo) as $sub) {

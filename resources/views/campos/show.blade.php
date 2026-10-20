@@ -46,7 +46,19 @@
         @endif
 
         {{-- Aspectos del trimestre: tap → capturar (los calculados llevan a lo que los alimenta) --}}
-        <h2 class="mb-3 text-lg font-bold">Aspectos del trimestre</h2>
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 class="text-lg font-bold">Aspectos del trimestre</h2>
+            {{-- Cada aspecto (y materia) se descarga por separado --}}
+            <div class="flex flex-wrap items-center gap-1.5 text-sm">
+                <span class="flex items-center gap-1 font-semibold text-ink-muted"><x-icon name="download" class="size-4" /> Excel:</span>
+                @foreach ($aspects as $a)
+                    <a href="{{ route('export.aspect', [$group, $a]) }}" class="chip chip-muted min-h-9 hover:bg-primary-soft hover:text-primary">{{ $a->name }}</a>
+                @endforeach
+                @foreach ($subjects as $sub)
+                    <a href="{{ route('export.subject', [$group, $sub]) }}" class="chip chip-muted min-h-9 hover:bg-primary-soft hover:text-primary">{{ $sub->name }}</a>
+                @endforeach
+            </div>
+        </div>
         <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
             @foreach ($aspects as $a)
                 @if ($a->isFromProjects())
@@ -66,7 +78,7 @@
                         </ul>
                     </div>
                 @elseif ($a->isFromSkills())
-                    <a href="{{ $skills->isEmpty() ? route('campos.edit', [$group, $campo]) : route('capture.skill', [$group, $skills->first()]) }}" class="tile min-h-32 border-primary/50">
+                    <a href="{{ $skills->isEmpty() ? route('campos.edit', [$group, $campo]) : '#habilidades' }}" class="tile min-h-32 border-primary/50">
                         <div class="flex items-start justify-between gap-2">
                             <span class="rounded-lg bg-surface-2 px-2 py-1 text-sm font-bold tabular-nums">{{ TermBook::fmt($a->weight) }}%</span>
                             <x-icon name="chevron-right" class="size-5 text-ink-muted" />
@@ -99,22 +111,24 @@
         @if ($skills->isNotEmpty())
             <section id="habilidades" class="mb-6 scroll-mt-24">
                 <h2 class="text-lg font-bold">Habilidades prioritarias</h2>
-                <p class="mb-3 text-sm text-ink-muted">Toca una habilidad para calificar a todo el grupo por nivel. Su promedio es el aspecto "{{ $aspects->first(fn ($a) => $a->isFromSkills())->name }}".</p>
+                <p class="mb-3 text-sm text-ink-muted">Toca una habilidad para ver el avance y calificar sus aplicaciones. Su promedio es el aspecto "{{ $aspects->first(fn ($a) => $a->isFromSkills())->name }}".</p>
                 <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
             @foreach ($skills as $skill)
                 @php($m = $book->skillMissing($skill))
-                <a href="{{ route('capture.skill', [$group, $skill]) }}" class="tile min-h-32">
+                @php($napps = $book->applicationsFor($skill)->count())
+                <a href="{{ route('skills.show', [$group, $skill]) }}" class="tile min-h-32">
                     <div class="flex items-start justify-between gap-2">
-                        <span class="rounded-lg bg-primary-soft px-2 py-1 text-xs font-bold text-primary">Habilidad</span>
+                        <span class="rounded-lg bg-primary-soft px-2 py-1 text-xs font-bold text-primary">{{ \App\Models\Skill::GRADINGS[$skill->grading] ?? 'Habilidad' }}</span>
                         <x-icon name="chevron-right" class="size-5 text-ink-muted" />
                     </div>
                     <h3 class="text-lg font-bold leading-snug">{{ $skill->name }}</h3>
                     <div class="mt-auto">
+                        <p class="mb-1 text-xs text-ink-muted">{{ $napps === 0 ? 'Sin aplicaciones' : ($napps === 1 ? '1 aplicación' : "{$napps} aplicaciones") }}</p>
                         <div class="mb-1 flex justify-between text-xs">
-                            <span class="lvl-text font-semibold" data-paint="missing:skill:{{ $skill->id }}" data-level="{{ $m ? 'pending' : 'done' }}">{{ $m ? "{$m} sin calificar" : 'Completo' }}</span>
-                            <span class="tabular-nums text-ink-muted" data-paint="count:skill:{{ $skill->id }}">{{ $total - $m }}/{{ $total }}</span>
+                            <span class="lvl-text font-semibold" data-level="{{ $m ? 'pending' : 'done' }}">{{ $m ? "{$m} con pendientes" : 'Completo' }}</span>
+                            <span class="tabular-nums text-ink-muted">{{ $total - $m }}/{{ $total }}</span>
                         </div>
-                        <x-progress :value="(int) floor(($total - $m) * 100 / max(1, $total))" bar="skill:{{ $skill->id }}" />
+                        <x-progress :value="(int) floor(($total - $m) * 100 / max(1, $total))" />
                     </div>
                 </a>
             @endforeach
@@ -150,11 +164,6 @@
             <p class="mb-4 rounded-xl bg-danger-soft p-3 text-sm font-semibold text-danger">Los aspectos suman {{ TermBook::fmt($book->totalWeight($campo)) }}%; deben sumar 100%.</p>
         @endif
 
-        {{-- Equivalencias de las habilidades que se miden (a qué calificación corresponde cada rango) --}}
-        @foreach ($skills->filter->isMeasured() as $skill)
-            <x-skill-ranges :skill="$skill" class="mb-3" />
-        @endforeach
-
         {{-- Matriz del campo --}}
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 class="text-lg font-bold">Calificaciones del campo</h2>
@@ -162,8 +171,7 @@
         </div>
         <x-search class="mb-3" pending-toggle="Solo pendientes" />
 
-        <section class="card overflow-x-auto" data-score-url="{{ route('score.update', $group) }}" data-advance="column"
-                 data-descriptors="{{ json_encode($skills->mapWithKeys(fn ($k) => [$k->id => $k->keypadConfig()]), JSON_UNESCAPED_UNICODE) }}">
+        <section class="card overflow-x-auto" data-score-url="{{ route('score.update', $group) }}" data-advance="column">
             <table class="w-full border-collapse text-sm">
                 <thead>
                     <tr class="border-b border-line text-left text-ink-muted">
@@ -175,7 +183,7 @@
                             </th>
                         @endforeach
                         @foreach ($skills as $skill)
-                            <th class="bg-primary-soft/40 px-2 py-3 text-center font-semibold"><span class="block max-w-36 truncate text-ink" title="{{ $skill->name }}">{{ $skill->name }}</span><span class="text-xs font-normal">{{ $skill->isMeasured() ? $skill->measure_unit.' → calif.' : 'habilidad' }}</span></th>
+                            <th class="bg-primary-soft/40 px-2 py-3 text-center font-semibold"><span class="block max-w-36 truncate text-ink" title="{{ $skill->name }}">{{ $skill->name }}</span><span class="text-xs font-normal">promedio</span></th>
                         @endforeach
                         @if ($subjects->isNotEmpty())
                             <th class="px-2 py-3 text-center font-semibold text-ink">Base</th>
@@ -213,8 +221,9 @@
                                 </td>
                             @endforeach
                             @foreach ($skills as $skill)
-                                <td class="bg-primary-soft/40 px-2 py-1.5 text-center"><x-score kind="skill" :id="$skill->id" :term="$book->term" :student="$s" :unit="$skill->name" :value="$book->skillScore($s->id, $skill->id)"
-                                    :mode="$skill->isMeasured() ? 'measure' : null" :measure="$book->skillMeasure($s->id, $skill->id)" /></td>
+                                @php($sk = $book->skillScore($s->id, $skill->id))
+                                <td class="lvl-text bg-primary-soft/40 px-2 py-1.5 text-center font-bold tabular-nums" @if ($sk !== null) data-level="{{ Level::of($sk) }}" @endif
+                                    title="Promedio de las aplicaciones">{{ TermBook::fmt($sk) }}</td>
                             @endforeach
                             @if ($subjects->isNotEmpty())
                                 <td class="lvl-text px-2 text-center font-semibold tabular-nums" data-paint="base:{{ $campo }}:{{ $s->id }}" @if ($base !== null) data-level="{{ Level::of($base) }}" @endif>{{ TermBook::fmt($base) }}</td>

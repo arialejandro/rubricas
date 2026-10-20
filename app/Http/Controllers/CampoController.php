@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Group;
 use App\Models\Skill;
+use App\Models\SkillCriterion;
 use App\Models\TermAspect;
 use App\Support\Campos;
 use App\Support\Level;
@@ -37,7 +38,7 @@ class CampoController extends Controller
         $term = $group->term();
         $aspects = $group->termAspects()->where('term', $term)->where('campo', $campo)->withCount('scores')->get();
         $subjects = $group->subjects()->where('campo', $campo)->withCount('scores')->get();
-        $skills = Campos::hasSkills($campo) ? $group->skills()->where('campo', $campo)->withCount('scores')->get() : collect();
+        $skills = Campos::hasSkills($campo) ? $group->skills()->where('campo', $campo)->with('criteria')->withCount('scores')->get() : collect();
         $canCopy = $aspects->isEmpty() && $term > 1
             && $group->termAspects()->where('term', $term - 1)->where('campo', $campo)->exists();
 
@@ -63,20 +64,25 @@ class CampoController extends Controller
         $levelRules = collect(array_keys(Level::LEVELS))->flatMap(fn ($l) => [
             'skills.*.'.Level::column($l) => ['nullable', 'string', 'max:1000'],
             "skills.*.level_labels.{$l}" => ['nullable', 'string', 'max:40'],
-        ])->merge(collect(array_keys(Skill::THRESHOLDS))->mapWithKeys(fn ($c) => ["skills.*.{$c}" => ['nullable', 'numeric', 'min:0', 'max:99999']]))
+            'skills.*.criteria.*.'.Level::column($l) => ['nullable', 'string', 'max:1000'],
+        ])->merge(collect(['min_7', 'min_9', 'min_10'])->mapWithKeys(fn ($c) => ["skills.*.{$c}" => ['nullable', 'numeric', 'min:0', 'max:99999']]))
             ->merge([
+                'skills.*.grading' => ['required', Rule::in(array_keys(Skill::GRADINGS))],
                 'skills.*.measure_unit' => ['nullable', 'string', 'max:40'],
                 'skills.*.lower_is_better' => ['nullable', 'boolean'],
-                'skills.*.mode' => ['nullable', Rule::in(['level', 'measure'])],
+                'skills.*.criteria' => ['nullable', 'array', 'max:10'],
+                'skills.*.criteria.*.id' => ['nullable', 'integer'],
+                'skills.*.criteria.*.description' => ['required', 'string', 'max:255'],
             ])
             ->all();
-        // Coma decimal en los rangos.
+        // Coma decimal en los rangos y criterios vacíos fuera.
         $request->merge(['skills' => collect($request->input('skills', []))->map(function ($k) {
-            foreach (array_keys(Skill::THRESHOLDS) as $c) {
+            foreach (['min_7', 'min_9', 'min_10'] as $c) {
                 if (isset($k[$c])) {
                     $k[$c] = str_replace(',', '.', trim((string) $k[$c]));
                 }
             }
+            $k['criteria'] = collect($k['criteria'] ?? [])->filter(fn ($c) => trim($c['description'] ?? '') !== '')->values()->all();
 
             return $k;
         })->all()]);
@@ -119,28 +125,44 @@ class CampoController extends Controller
         $removedSubjects = (clone $subjectQuery)->whereNotIn('id', collect($data['subjects'] ?? [])->pluck('id')->filter())->withCount('scores')->get();
         $skillQuery = $group->skills()->where('campo', $campo);
         $removedSkills = Campos::hasSkills($campo)
-            ? (clone $skillQuery)->whereNotIn('id', collect($data['skills'] ?? [])->pluck('id')->filter())->withCount('scores')->get()
+            ? (clone $skillQuery)->whereNotIn('id', collect($data['skills'] ?? [])->pluck('id')->filter())->withCount('applications')->get()
             : collect();
+
+        // Criterios de habilidad que se quitan y ya tienen calificaciones.
+        $removedCriteria = collect($data['skills'] ?? [])->filter(fn ($k) => ! empty($k['id']))->flatMap(function ($k) use ($skillQuery) {
+            $keep = collect($k['criteria'])->pluck('id')->filter();
+
+            return SkillCriterion::where('skill_id', (clone $skillQuery)->whereKey($k['id'])->value('id'))
+                ->whereNotIn('id', $keep)->withCount('scores')->get();
+        });
 
         // Quitar algo que ya tiene calificaciones las borra: se pide confirmación explícita.
         $graded = $removedAspects->where('scores_count', '>', 0)->pluck('name')
             ->merge($removedSubjects->where('scores_count', '>', 0)->pluck('name'))
-            ->merge($removedSkills->where('scores_count', '>', 0)->pluck('name'));
+            ->merge($removedSkills->where('applications_count', '>', 0)->pluck('name'))
+            ->merge($removedCriteria->where('scores_count', '>', 0)->pluck('description'));
         if ($graded->isNotEmpty() && ! $request->boolean('confirm_remove')) {
             throw ValidationException::withMessages([
                 'confirm_remove' => 'Vas a quitar '.$graded->implode(', ').', que ya tienen calificaciones. Marca la casilla de confirmación para borrarlas.',
             ]);
         }
 
-        DB::transaction(function () use ($group, $term, $campo, $data, $removedAspects, $removedSubjects, $removedSkills, $aspectQuery, $subjectQuery, $skillQuery) {
+        DB::transaction(function () use ($group, $term, $campo, $data, $removedAspects, $removedSubjects, $removedSkills, $removedCriteria, $aspectQuery, $subjectQuery, $skillQuery) {
             $removedAspects->each->delete();
             $removedSubjects->each->delete();
             $removedSkills->each->delete();
+            $removedCriteria->each->delete();
 
             foreach ($data['skills'] ?? [] as $i => $k) {
-                $attrs = [...collect($k)->except('id')->all(), 'position' => $i];
+                $attrs = [...collect($k)->except(['id', 'criteria'])->all(), 'position' => $i];
                 $existing = ! empty($k['id']) ? (clone $skillQuery)->find($k['id']) : null;
                 $skill = $existing ? tap($existing)->update($attrs) : $group->skills()->create([...$attrs, 'campo' => $campo]);
+
+                foreach ($k['criteria'] as $j => $c) {
+                    $fields = [...collect($c)->except('id')->all(), 'position' => $j];
+                    $crit = ! empty($c['id']) ? $skill->criteria()->find($c['id']) : null;
+                    $crit ? $crit->update($fields) : $skill->criteria()->create($fields);
+                }
 
                 // Si cambiaron los rangos, las mediciones ya capturadas se vuelven a calificar.
                 if ($skill->isMeasured()) {
@@ -169,8 +191,11 @@ class CampoController extends Controller
     }
 
     /**
-     * Habilidad medible: unidad + los 4 cortes completos y en orden (de menor a mayor, o al revés
-     * si "menos es mejor"). Sin unidad, la habilidad se califica eligiendo el nivel.
+     * Cómo se califica la habilidad:
+     *  - level: la maestra elige el nivel.
+     *  - measure: unidad + dónde EMPIEZA cada nivel (En proceso, Satisfactorio, Logrado). El corte
+     *    entre 7 y 8 se calcula solo: la mitad entre el valor más bajo y el más alto de En proceso.
+     *  - criteria: lista de criterios (al menos uno); la calificación es su promedio redondeado al nivel.
      */
     private function normalizeSkill(array $k): array
     {
@@ -178,29 +203,35 @@ class CampoController extends Controller
         $k['level_labels'] = $labels ?: null;
         $k['measure_unit'] = trim((string) ($k['measure_unit'] ?? '')) ?: null;
         $k['lower_is_better'] = (bool) ($k['lower_is_better'] ?? false);
-        $mode = $k['mode'] ?? null;
-        unset($k['mode']);
+        $k['criteria'] ??= [];
+        $none = ['min_7' => null, 'min_8' => null, 'min_9' => null, 'min_10' => null];
 
-        if ($mode === 'measure' && $k['measure_unit'] === null) {
+        if ($k['grading'] === 'criteria') {
+            if ($k['criteria'] === []) {
+                throw ValidationException::withMessages(['skills' => "{$k['name']}: agrega al menos un criterio para calificarla por criterios."]);
+            }
+
+            return [...$k, ...$none, 'measure_unit' => null, 'lower_is_better' => false];
+        }
+        if ($k['grading'] === 'level') {
+            return [...$k, ...$none, 'measure_unit' => null, 'lower_is_better' => false];
+        }
+
+        // measure
+        if ($k['measure_unit'] === null) {
             throw ValidationException::withMessages(['skills' => "{$k['name']}: escribe qué se mide (ej. palabras por minuto)."]);
         }
-        if ($mode === 'level' || $k['measure_unit'] === null) {
-            $k['measure_unit'] = null;
-            return [...$k, 'min_7' => null, 'min_8' => null, 'min_9' => null, 'min_10' => null, 'lower_is_better' => false];
-        }
-
-        $cuts = array_map(fn ($c) => $k[$c] ?? null, ['min_7', 'min_8', 'min_9', 'min_10']);
+        $cuts = array_map(fn ($c) => $k[$c] ?? null, ['min_7', 'min_9', 'min_10']);
         if (in_array(null, $cuts, true) || in_array('', $cuts, true)) {
-            throw ValidationException::withMessages(['skills' => "{$k['name']}: para calcular el nivel con la medición, llena los cuatro rangos (desde cuánto vale 7, 8, 9 y 10)."]);
+            throw ValidationException::withMessages(['skills' => "{$k['name']}: indica dónde empieza En proceso, Satisfactorio y Logrado."]);
         }
-        $cuts = array_map('floatval', $cuts);
-        $sorted = $cuts;
-        $k['lower_is_better'] ? rsort($sorted) : sort($sorted);
-        if ($sorted !== $cuts || count(array_unique($cuts)) !== 4) {
+        [$p, $s, $l] = array_map('floatval', $cuts);
+        $ordered = $k['lower_is_better'] ? ($p > $s && $s > $l) : ($p < $s && $s < $l);
+        if (! $ordered) {
             throw ValidationException::withMessages(['skills' => "{$k['name']}: los rangos deben ir ".($k['lower_is_better'] ? 'de mayor a menor (menos es mejor)' : 'de menor a mayor').', sin repetirse.']);
         }
 
-        return $k;
+        return [...$k, 'min_7' => $p, 'min_8' => Skill::splitProceso($p, $s, $k['lower_is_better']), 'min_9' => $s, 'min_10' => $l];
     }
 
     public function copyPrevious(Group $group, string $campo): RedirectResponse

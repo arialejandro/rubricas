@@ -5,7 +5,8 @@
     calificación que le corresponde, fija (no se edita: sale de la medición y los rangos).
     `labels` (nivel => nombre) agrega el nombre del nivel junto a la calificación.
 --}}
-@props(['kind', 'id', 'student', 'unit', 'value' => null, 'term' => null, 'mode' => null, 'measure' => null, 'labels' => null])
+@props(['kind', 'id', 'student', 'unit', 'value' => null, 'term' => null, 'mode' => null, 'measure' => null, 'labels' => null,
+    'wrap' => 'inline-flex items-center gap-1.5'])
 @php
     $fmt = fn ($n) => $n === null ? '' : rtrim(rtrim(number_format($n, 2, '.', ''), '0'), '.');
     $v = $fmt($value);
@@ -14,7 +15,7 @@
     $level = \App\Support\Level::of($value);
     $shown = $mode === 'measure' ? ($m !== '' ? $m : $v) : $v;
 @endphp
-@if ($mode === 'measure')<span class="inline-flex items-center gap-1.5">@endif
+@if ($mode === 'measure')<span class="{{ $wrap }}">@endif
 <button type="button" {{ $attributes->merge(['class' => 'score']) }}
         data-score-cell data-kind="{{ $kind }}" data-id="{{ $id }}" @if ($term) data-term="{{ $term }}" @endif
         data-mode="{{ $mode }}" @if ($mode === 'measure') data-measure="{{ $m }}" @endif
@@ -22,7 +23,7 @@
         data-value="{{ $v }}" @if ($v === '') data-empty @else data-level="{{ $level }}" @endif
         aria-label="{{ $student->name }}, {{ $unit }}: {{ $v === '' ? 'sin calificar' : ($mode === 'measure' ? $m.' → '.$v : $v) }}">{{ $shown === '' ? '—' : $shown }}</button>
 @if ($mode === 'measure')
-    <span class="lvl-chip {{ $labels ? 'min-w-32' : 'min-w-9' }} justify-center text-sm tabular-nums" data-measure-score @if ($labels) data-labels="{{ json_encode($labels, JSON_UNESCAPED_UNICODE) }}" @endif
+    <span class="lvl-chip {{ $labels ? 'w-full' : 'w-10' }} justify-center text-sm tabular-nums" data-measure-score @if ($labels) data-labels="{{ json_encode($labels, JSON_UNESCAPED_UNICODE) }}" @endif
           @if ($v !== '') data-level="{{ $level }}" @endif title="Calificación (se calcula de la medición)">{{ $v === '' ? '—' : $v.($labels ? ' · '.($labels[$level] ?? '') : '') }}</span>
 </span>
 @endif

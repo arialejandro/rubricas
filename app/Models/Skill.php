@@ -19,11 +19,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *    min_7 vale 6. Con lower_is_better los rangos son "hasta" (p. ej. número de errores).
  */
 #[Fillable([
-    'campo', 'name', 'measure_unit', 'lower_is_better', 'min_7', 'min_8', 'min_9', 'min_10', 'level_labels',
+    'campo', 'name', 'grading', 'measure_unit', 'lower_is_better', 'min_7', 'min_8', 'min_9', 'min_10', 'level_labels',
     'level_logrado', 'level_satisfactorio', 'level_proceso', 'level_apoyo', 'position',
 ])]
 class Skill extends Model
 {
+    /** Cómo se califica la habilidad. */
+    public const GRADINGS = ['level' => 'Elijo el nivel', 'measure' => 'Mido y se calcula', 'criteria' => 'Por criterios'];
+
     /** Calificación → nivel, en el orden en que se evalúan los cortes. */
     public const THRESHOLDS = ['min_10' => 10, 'min_9' => 9, 'min_8' => 8, 'min_7' => 7];
 
@@ -46,9 +49,52 @@ class Skill extends Model
         return $this->hasMany(SkillScore::class);
     }
 
+    public function criteria(): HasMany
+    {
+        return $this->hasMany(SkillCriterion::class)->orderBy('position')->orderBy('id');
+    }
+
+    public function applications(): HasMany
+    {
+        return $this->hasMany(SkillApplication::class)->orderByRaw('applied_on IS NULL, applied_on')->orderBy('id');
+    }
+
     public function isMeasured(): bool
     {
-        return filled($this->measure_unit);
+        return $this->grading === 'measure' && filled($this->measure_unit);
+    }
+
+    public function isByCriteria(): bool
+    {
+        return $this->grading === 'criteria';
+    }
+
+    /** Modo del teclado para capturar una aplicación (en "por criterios" se califica cada criterio por nivel). */
+    public function keypadMode(): string
+    {
+        return $this->isMeasured() ? 'measure' : 'levels';
+    }
+
+    /**
+     * Corte entre 7 y 8 dentro de "En proceso": la mitad entre su valor más bajo y el más alto.
+     * Ej. En proceso 85–99 → 8 desde 92 (85–91 = 7, 92–99 = 8). Con "menos es mejor", al revés.
+     */
+    public static function splitProceso(float $min7, float $min9, bool $lower): float
+    {
+        $integers = floor($min7) == $min7 && floor($min9) == $min9;
+        if ($lower) {
+            // "hasta": En proceso va de (min9, min7]; 8 = la mitad más baja.
+            return $integers ? floor((($min9 + 1) + $min7) / 2) : ($min9 + $min7) / 2;
+        }
+
+        // "desde": En proceso va de [min7, min9); 8 = la mitad más alta.
+        return $integers ? ceil(($min7 + ($min9 - 1)) / 2) : ($min7 + $min9) / 2;
+    }
+
+    /** Calificación de una aplicación "por criterios": promedio redondeado al nivel (6–10). */
+    public static function scoreFromCriteria(float $average): int
+    {
+        return (int) max(6, min(10, round($average)));
     }
 
     /** Calificación 6–10 que corresponde a una medición según los rangos de la maestra. */
