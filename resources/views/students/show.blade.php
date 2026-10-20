@@ -114,12 +114,12 @@
                 </div>
             </form>
             <p class="hint">Dar de baja conserva sus calificaciones y deja de contarlo como pendiente.</p>
-            @unless ($student->hasScores())
-                <form method="POST" action="{{ route('students.destroy', [$group, $student]) }}" data-confirm="¿Eliminar a {{ $student->name }}?">
-                    @csrf @method('DELETE')
-                    <button class="btn btn-danger">Eliminar alumno</button>
-                </form>
-            @endunless
+            <form method="POST" action="{{ route('students.destroy', [$group, $student]) }}"
+                  data-confirm="¿Eliminar a {{ $student->name }}?{{ $student->hasScores() ? ' Se borran también sus calificaciones.' : '' }}">
+                @csrf @method('DELETE')
+                <input type="hidden" name="confirm" value="1">
+                <button class="btn btn-danger"><x-icon name="trash" class="size-4" /> Eliminar alumno</button>
+            </form>
         </div>
     </details>
 

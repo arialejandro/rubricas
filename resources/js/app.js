@@ -31,6 +31,21 @@ document.querySelectorAll('form[data-confirm]').forEach((form) => {
     });
 });
 
+// Cargar lista con "Reemplazar lista": se confirma antes, porque borra a los alumnos actuales.
+document.querySelectorAll('form[data-replace-guard]').forEach((form) => {
+    form.addEventListener('submit', (e) => {
+        if (form.querySelector('[name="replace"]:checked')?.value !== '1') return;
+        if (!confirm(form.dataset.replaceGuard)) {
+            e.preventDefault();
+            const file = form.querySelector('[data-autosubmit]');
+            if (file) {
+                file.value = '';
+                form.querySelector('[data-file-name]')?.replaceChildren('Subir Excel');
+            }
+        }
+    });
+});
+
 // Subir Excel de alumnos: al elegir el archivo se envía solo (un tap menos).
 document.querySelectorAll('[data-autosubmit]').forEach((input) => {
     input.addEventListener('change', () => {

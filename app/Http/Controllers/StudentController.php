@@ -8,6 +8,7 @@ use App\Support\TermBook;
 use App\Support\StudentListImporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -39,7 +40,7 @@ class StudentController extends Controller
     {
         $request->validate(['names' => ['required', 'string', 'max:20000']]);
 
-        return $this->report($group, StudentListImporter::fromText($request->input('names')));
+        return $this->report($group, StudentListImporter::fromText($request->input('names')), $request->boolean('replace'));
     }
 
     public function import(Request $request, Group $group): RedirectResponse
@@ -57,7 +58,7 @@ class StudentController extends Controller
             return back()->withErrors(['file' => 'No se pudo leer el archivo. Revisa que sea un Excel válido o usa la plantilla.']);
         }
 
-        return $this->report($group, $rows);
+        return $this->report($group, $rows, $request->boolean('replace'));
     }
 
     public function template(Group $group): StreamedResponse
@@ -81,25 +82,49 @@ class StudentController extends Controller
         return back()->with('status', $student->active ? 'Alumno actualizado.' : "{$student->name} quedó dado de baja; sus calificaciones se conservan.");
     }
 
-    public function destroy(Group $group, Student $student): RedirectResponse
+    /** Eliminar borra también sus calificaciones (en cascada); si tiene, se pide confirmación explícita. */
+    public function destroy(Request $request, Group $group, Student $student): RedirectResponse
     {
-        if ($student->hasScores()) {
-            return back()->withErrors(['student' => "{$student->name} ya tiene calificaciones. Dalo de baja en lugar de eliminarlo para no perderlas."]);
+        if ($student->hasScores() && ! $request->boolean('confirm')) {
+            return back()->withErrors(['student' => "{$student->name} tiene calificaciones. Confirma para eliminarlo junto con ellas (o dalo de baja para conservarlas)."]);
         }
 
         $student->delete();
 
-        return redirect()->route('students.index', $group)->with('status', 'Alumno eliminado.');
+        return redirect()->route('students.index', $group)->with('status', "{$student->name} eliminado.");
     }
 
-    private function report(Group $group, array $rows): RedirectResponse
+    /** Vaciar la lista completa del grupo (alumnos y sus calificaciones). Se confirma escribiendo el grupo. */
+    public function destroyAll(Request $request, Group $group): RedirectResponse
+    {
+        $request->validate(['confirm_name' => ['required', Rule::in([$group->label(), $group->name])]], [
+            'confirm_name.required' => 'Escribe el grupo para confirmar.',
+            'confirm_name.in' => 'Escribe el grupo exactamente como aparece para confirmar.',
+        ]);
+
+        $count = $group->students()->count();
+        $group->students()->delete();
+
+        return redirect()->route('students.index', $group)->with('status', "Lista vaciada: se eliminaron {$count} alumnos.");
+    }
+
+    /** $replace: la lista nueva sustituye a la actual (se eliminan los alumnos previos y sus calificaciones). */
+    private function report(Group $group, array $rows, bool $replace = false): RedirectResponse
     {
         if ($rows === []) {
             return back()->withErrors(['file' => 'No se encontraron nombres. La lista necesita una columna "Nombre" (y opcional "N.L.").']);
         }
 
-        $r = StudentListImporter::apply($group, $rows);
+        $removed = $replace ? $group->students()->count() : 0;
+        $r = DB::transaction(function () use ($group, $rows, $replace) {
+            if ($replace) {
+                $group->students()->delete();
+            }
+
+            return StudentListImporter::apply($group, $rows);
+        });
         $parts = array_filter([
+            $removed ? "{$removed} anteriores eliminados" : null,
             $r['added'] ? "{$r['added']} nuevos" : null,
             $r['updated'] ? "{$r['updated']} con N.L. actualizado" : null,
             $r['unchanged'] ? "{$r['unchanged']} ya estaban" : null,

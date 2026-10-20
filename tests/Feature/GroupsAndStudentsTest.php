@@ -81,6 +81,39 @@ class GroupsAndStudentsTest extends TestCase
         @unlink($path);
     }
 
+    public function test_delete_student_with_scores_requires_confirmation(): void
+    {
+        $ana = $this->group->students()->create(['name' => 'Ana']);
+        $aspect = $this->group->termAspects()->create(['term' => 1, 'campo' => 'lenguajes', 'name' => 'Examen', 'type' => 'direct', 'weight' => 100]);
+        $aspect->scores()->create(['student_id' => $ana->id, 'score' => 9]);
+
+        $this->actingAs($this->teacher)->delete(route('students.destroy', [$this->group, $ana]))->assertSessionHasErrors('student');
+        $this->assertModelExists($ana);
+
+        $this->actingAs($this->teacher)->delete(route('students.destroy', [$this->group, $ana]), ['confirm' => 1])->assertSessionHasNoErrors();
+        $this->assertModelMissing($ana);
+        $this->assertSame(0, $aspect->scores()->count());
+    }
+
+    public function test_replace_list_and_empty_list(): void
+    {
+        $this->group->students()->create(['name' => 'Viejo Uno', 'list_number' => 1]);
+        $this->group->students()->create(['name' => 'Viejo Dos', 'list_number' => 2]);
+
+        $this->actingAs($this->teacher)
+            ->post(route('students.store', $this->group), ['names' => "1 Nueva Ana\n2 Nuevo Bruno", 'replace' => '1'])
+            ->assertSessionHas('status', 'Lista cargada: 2 anteriores eliminados · 2 nuevos.');
+        $this->assertSame(['Nueva Ana', 'Nuevo Bruno'], $this->group->students()->pluck('name')->all());
+
+        // "Agregar" (replace=0) conserva la lista.
+        $this->actingAs($this->teacher)->post(route('students.store', $this->group), ['names' => '3 Carla', 'replace' => '0']);
+        $this->assertSame(3, $this->group->students()->count());
+
+        $this->actingAs($this->teacher)->delete(route('students.destroyAll', $this->group), ['confirm_name' => 'mal'])->assertSessionHasErrors('confirm_name');
+        $this->actingAs($this->teacher)->delete(route('students.destroyAll', $this->group), ['confirm_name' => '3° B'])->assertSessionHasNoErrors();
+        $this->assertSame(0, $this->group->students()->count());
+    }
+
     public function test_a_teacher_has_at_most_one_group_per_shift(): void
     {
         $payload = ['shift' => 'matutino', 'grade' => 4, 'name' => 'c', 'school_name' => 'Escuela'];

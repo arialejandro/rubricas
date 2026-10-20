@@ -57,6 +57,7 @@ Route::middleware('auth')->group(function () {
         Route::get('alumnos', [StudentController::class, 'index'])->name('students.index');
         Route::post('alumnos', [StudentController::class, 'store'])->name('students.store');
         Route::post('alumnos/importar', [StudentController::class, 'import'])->name('students.import');
+        Route::delete('alumnos', [StudentController::class, 'destroyAll'])->name('students.destroyAll');
         Route::get('alumnos/plantilla', [StudentController::class, 'template'])->name('students.template');
         Route::get('alumnos/{student}', [StudentController::class, 'show'])->name('students.show');
         Route::put('alumnos/{student}', [StudentController::class, 'update'])->name('students.update');
